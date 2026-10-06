@@ -27,6 +27,7 @@ walks to every day you contributed and mines it out. The busier the day, the ric
 - 💎 **Ore by intensity** — GitHub's four contribution levels become coal, copper, gold and diamond.
 - 🚶 **A real dig** — the miner walks the tunnels week by week, reaches each ore and strikes it from the side.
 - 🎞️ **Animated, then still** — sparkles, a pickaxe swing and a running counter. The loop ends on your year as a tunnel map.
+- 📊 **A closing stats card** — total contributions, active days, days per ore, your best day and your longest streak.
 - ⏱️ **A loop that fits** — busy years speed up automatically, so the animation stays around 25 seconds.
 - 🪶 **Small** — each frame stores only the pixels that changed, so a full year is usually 100 to 250 KB.
 - 🔍 **Crisp at any size** — drawn at 1 pixel per sprite pixel and upscaled with nearest-neighbour sampling.

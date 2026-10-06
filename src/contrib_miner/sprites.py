@@ -104,6 +104,13 @@ SPARKLE = [
 ]
 SPARKLE_KEY = {"x": "gold_hi", "w": "spark"}
 
+# Ore icon for the closing card.
+GEM = [
+    ".h.",
+    "hoo",
+    ".o.",
+]
+
 # Walked-through dirt: a darker passage.
 PATH = [
     "eeeeeeee",

@@ -16,6 +16,7 @@ from contrib_miner.render import (
     render_frames,
     render_gif,
 )
+from contrib_miner.stats import summarize
 
 
 def payload(days_per_week):
@@ -132,7 +133,7 @@ class RenderTests(unittest.TestCase):
 
     def test_every_ore_is_dug_by_the_last_frame(self):
         cal = sample_calendar("tester")
-        last = render_frames(cal)[0][-1]
+        last = render_frames(cal)[0][-2]  # the finished mine, just before the card
         self.assertEqual(last.w, 16 + len(cal.weeks) * S.TILE)
         # Stone only appears in unmined ore blocks.
         stone = {S.IDX["stone"], S.IDX["stone_dark"], S.IDX["stone_light"]}
@@ -168,6 +169,27 @@ class TimingTests(unittest.TestCase):
         capped = sum(render_frames(cal, max_seconds=25)[1])
         uncapped = sum(render_frames(cal, max_seconds=None)[1])
         self.assertGreater(uncapped, capped)
+
+
+class StatsTests(unittest.TestCase):
+    def test_summary(self):
+        counts = [0, 3, 1, 0, 2, 2, 9, 0, 1]  # streaks of 2 and 3, best day 9
+        levels = [0, 2, 1, 0, 2, 2, 4, 0, 1]
+        days = [Day(f"2026-01-{i + 1:02d}", c, lv) for i, (c, lv) in enumerate(zip(counts, levels, strict=True))]
+        cal = sample_calendar("stats")
+        cal.weeks = [days[:7], days[7:] + [None] * 5]
+        cal.total = sum(counts)
+        stats = summarize(cal)
+        self.assertEqual(stats.total, 18)
+        self.assertEqual(stats.active_days, 6)
+        self.assertEqual(stats.best_day, 9)
+        self.assertEqual(stats.longest_streak, 3)
+        self.assertEqual(stats.ores, {4: 1, 3: 0, 2: 3, 1: 2})
+
+    def test_last_frame_is_the_card_and_holds(self):
+        frames, durations = render_frames(sample_calendar("tester"))
+        self.assertGreater(durations[-1], 3000)
+        self.assertIn(S.IDX["tunnel"], frames[-1].px)  # the card panel
 
 
 if __name__ == "__main__":

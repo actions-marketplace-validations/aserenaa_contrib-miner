@@ -18,6 +18,7 @@ from PIL import Image
 
 from . import sprites as S
 from .fetch import Calendar
+from .stats import Stats, summarize
 
 MARGIN_X = 8  # one tile of dirt on each side; the left one holds the entry shaft
 HEADER_Y = 3
@@ -29,7 +30,8 @@ SURFACE_Y = GRASS_Y - S.TILE  # where the miner stands before climbing down
 
 # Frame timings in milliseconds. GIF stores delays in 10 ms units, so keep multiples of 10.
 INTRO_MS = 600
-OUTRO_MS = 3000
+OUTRO_MS = 1000  # the finished mine, before the card
+CARD_MS = 4000
 TWINKLE_EVERY = 40  # frames; star changes touch the whole sky, so keep them rare
 DEFAULT_MAX_SECONDS = 25
 
@@ -43,6 +45,9 @@ class Timing:
 
     def mining_ms(self, moves: int, mines: int) -> int:
         walk_frames = -(-moves // self.stride)  # ceiling division
+        if not self.wind_up:
+            # Walking between neighbouring ores is folded into the strike frame.
+            walk_frames = max(0, walk_frames - mines)
         return walk_frames * self.step + mines * (self.wind_up + self.strike)
 
 
@@ -67,7 +72,7 @@ def choose_timing(moves: int, mines: int, max_seconds: float | None) -> Timing:
     base = Timing()
     if not max_seconds:
         return base
-    budget = max_seconds * 1000 - INTRO_MS - OUTRO_MS
+    budget = max_seconds * 1000 - INTRO_MS - OUTRO_MS - CARD_MS
     natural = base.mining_ms(moves, mines)
     if natural <= budget:
         return base
@@ -253,6 +258,67 @@ class Scene:
         return c
 
 
+Run = tuple[str, str]  # (text, palette colour); a "gem:<level>" text draws an ore icon
+
+
+def _run_width(runs: list[Run]) -> int:
+    width = 0
+    for text, _ in runs:
+        width += 4 if text.startswith("gem:") else len(text) * S.GLYPH_ADVANCE
+    return width - 1
+
+
+# Coal is nearly black, so on the dark card its icon uses lighter greys.
+CARD_GEMS = {1: ("coal_hi", "stone_light")}
+
+
+def card_lines(stats: Stats) -> list[list[Run]]:
+    ores: list[Run] = []
+    for level, days in stats.ores.items():
+        if ores:
+            ores.append(("  ", "spark"))
+        ores += [(f"gem:{level}", ""), (f" {days}", "spark")]
+    return [
+        [
+            (str(stats.total), "spark"),
+            (" CONTRIBUTIONS IN ", "stone_light"),
+            (str(stats.active_days), "spark"),
+            (" DAYS", "stone_light"),
+        ],
+        ores,
+        [
+            ("BEST DAY ", "stone_light"),
+            (str(stats.best_day), "spark"),
+            ("  LONGEST STREAK ", "stone_light"),
+            (str(stats.longest_streak), "spark"),
+            (" DAYS", "stone_light"),
+        ],
+    ]
+
+
+def draw_card(c: Canvas, stats: Stats) -> None:
+    """A dark panel centred over the mine. It uses fixed colours so it reads the same in every theme."""
+    lines = card_lines(stats)
+    pad, line_h = 6, 8
+    w = max(_run_width(line) for line in lines) + pad * 2
+    h = len(lines) * line_h - 3 + pad * 2
+    x0 = (c.w - w) // 2
+    y0 = GRID_Y + (ROWS * S.TILE - h) // 2
+    c.rect(x0 - 1, y0 - 1, w + 2, h + 2, S.IDX["gold"])
+    c.rect(x0, y0, w, h, S.IDX["tunnel"])
+    for i, line in enumerate(lines):
+        x = x0 + (w - _run_width(line)) // 2
+        y = y0 + pad + i * line_h
+        for text, colour in line:
+            if text.startswith("gem:"):
+                ore, hi = CARD_GEMS.get(int(text[4:]), S.ORES[int(text[4:])])
+                c.blit(S.GEM, {"o": ore, "h": hi}, x, y + 1)
+                x += 4
+            else:
+                c.text(text, x, y, colour)
+                x += len(text) * S.GLYPH_ADVANCE
+
+
 def render_frames(cal: Calendar, max_seconds: float | None = DEFAULT_MAX_SECONDS) -> tuple[list[Canvas], list[int]]:
     steps = plan(cal)
     timing = choose_timing(
@@ -291,7 +357,10 @@ def render_frames(cal: Calendar, max_seconds: float | None = DEFAULT_MAX_SECONDS
             if pending >= timing.stride:
                 flush_walk()
         else:
-            flush_walk()
+            if timing.wind_up:
+                flush_walk()
+            else:
+                pending = 0  # fastest mode: the strike frame also shows where he walked to
             ox, oy = scene.cell_xy(step.col, step.row)
             if timing.wind_up:
                 push(S.MINER_UP, timing.wind_up, effects=[(ox + 2, oy + 2)])
@@ -302,6 +371,10 @@ def render_frames(cal: Calendar, max_seconds: float | None = DEFAULT_MAX_SECONDS
 
     counted = cal.total
     push(S.MINER_UP, OUTRO_MS)
+    card = scene.frame(len(frames), counted, (x, y, S.MINER_UP))
+    draw_card(card, summarize(cal))
+    frames.append(card)
+    durations.append(CARD_MS)
     return frames, durations
 
 
