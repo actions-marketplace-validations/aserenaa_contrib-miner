@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-06
+
 ### Added
 
 - `max_seconds` input and `--max-seconds` flag, 25 by default. Busy years speed up to fit: delays
@@ -39,6 +41,7 @@ First public release.
 - `contrib-miner` command line tool with `--sample` and `--from-json` for offline previews.
 - Delta-encoded frames that keep a full year at about 100 KB at the default 2x scale.
 
-[Unreleased]: https://github.com/aserenaa/contrib-miner/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/aserenaa/contrib-miner/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/aserenaa/contrib-miner/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/aserenaa/contrib-miner/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/aserenaa/contrib-miner/releases/tag/v1.0.0
