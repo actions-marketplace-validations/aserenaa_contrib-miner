@@ -1,0 +1,34 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste tokens.** Security issues go through [private reporting](https://github.com/aserenaa/contrib-miner/security/advisories/new) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you ran, what you expected, and what you got (the failing workflow log helps).
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How did you run it?
+      options: [GitHub Action, Command line]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: contrib-miner version
+      description: The action ref (for example `v1`) or `git rev-parse --short HEAD` in your clone.
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      description: Only for the command line. Output of `python3 --version`.

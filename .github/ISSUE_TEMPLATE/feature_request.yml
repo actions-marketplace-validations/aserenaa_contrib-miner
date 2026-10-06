@@ -1,0 +1,17 @@
+name: Feature request
+description: Suggest an improvement or a new theme
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like contrib-miner to do?
+      description: For art ideas, a sketch or reference image helps a lot.
+    validations:
+      required: true

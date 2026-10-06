@@ -1,0 +1,45 @@
+name: Contrib Miner GIF
+description: Render your GitHub contribution graph as an 8-bit mining GIF.
+author: aserenaa
+branding:
+  icon: image
+  color: purple
+
+inputs:
+  github_user_name:
+    description: GitHub login whose contributions are rendered.
+    default: ${{ github.repository_owner }}
+  output:
+    description: Path of the GIF to write.
+    default: dist/miner.gif
+  scale:
+    description: Integer upscale factor for crisp pixels (1-8).
+    default: "2"
+  github_token:
+    description: Token used for the GraphQL API. The default token sees public contributions only.
+    default: ${{ github.token }}
+
+outputs:
+  path:
+    description: Path of the generated GIF.
+    value: ${{ inputs.output }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: "3.12"
+    - name: Install contrib-miner
+      shell: bash
+      run: pip install --quiet "$ACTION_PATH"
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+    - name: Render GIF
+      shell: bash
+      run: contrib-miner --user "$USER_NAME" --output "$OUTPUT" --scale "$SCALE"
+      env:
+        USER_NAME: ${{ inputs.github_user_name }}
+        OUTPUT: ${{ inputs.output }}
+        SCALE: ${{ inputs.scale }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
