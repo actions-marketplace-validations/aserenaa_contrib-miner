@@ -167,13 +167,19 @@ class TimingTests(unittest.TestCase):
             self.assertEqual(ms % 10, 0, "GIF delays are stored in 10 ms units")
 
     def test_loops_fit_the_budget(self):
-        for cal, limit in ((sample_calendar("tester"), 25), (busy_year(), 26)):
-            frames, durations = render_frames(cal, max_seconds=25)
-            self.assertLessEqual(sum(durations) / 1000, limit)
+        for cal in (sample_calendar("tester"), busy_year()):
+            frames, durations = render_frames(cal, max_seconds=30)
+            self.assertLessEqual(sum(durations) / 1000, 30)
+
+    def test_frames_never_play_faster_than_the_floor(self):
+        for cal in (sample_calendar("tester"), busy_year()):
+            for budget in (30, 5):
+                durations = render_frames(cal, max_seconds=budget)[1]
+                self.assertGreaterEqual(min(durations), FASTEST.step_ms)
 
     def test_uncapped_loop_is_longer(self):
         cal = sample_calendar("tester")
-        capped = sum(render_frames(cal, max_seconds=25)[1])
+        capped = sum(render_frames(cal, max_seconds=20)[1])
         uncapped = sum(render_frames(cal, max_seconds=None)[1])
         self.assertGreater(uncapped, capped)
 

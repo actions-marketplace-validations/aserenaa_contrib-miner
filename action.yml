@@ -26,7 +26,7 @@ inputs:
     default: "2"
   max_seconds:
     description: Target loop length in seconds. Busy years speed up to fit; 0 keeps the natural speed.
-    default: "25"
+    default: "30"
   github_token:
     description: Token used for the GraphQL API. The default token sees public contributions only.
     default: ${{ github.token }}

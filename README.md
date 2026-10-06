@@ -31,7 +31,7 @@ walks to every day you contributed and mines it out. The busier the day, the ric
 - 🚶 **A real dig** — the miner walks the tunnels week by week, reaches each ore and strikes it from the side.
 - 🎞️ **Animated, then still** — sparkles, a pickaxe swing and a running counter. The loop ends on your year as a tunnel map.
 - 📊 **A closing stats card** — total contributions, active days, days per ore, your best day and your longest streak.
-- ⏱️ **A loop that fits** — busy years speed up automatically, so the animation stays around 25 seconds.
+- ⏱️ **A loop that fits** — busy years speed up automatically, so the animation stays around 30 seconds and never plays faster than 25 frames per second.
 - 🪶 **Small** — each frame stores only the pixels that changed, so a full year is usually 100 to 250 KB.
 - 🌗 **Dark and light** — a night sky or a daytime one with clouds, switched by the viewer's GitHub theme.
 - 🔍 **Crisp at any size** — drawn at 1 pixel per sprite pixel and upscaled with nearest-neighbour sampling.
@@ -103,7 +103,7 @@ Only want one theme? Drop `light_output` and the `<source>` line.
 | `theme` | `dark` | Theme of `output`: `dark` or `light` |
 | `light_output` | none | Also write a light-theme GIF here, from the same data |
 | `scale` | `2` | Integer upscale factor, 1 to 8 |
-| `max_seconds` | `25` | Target loop length. Busy years speed up to fit, `0` keeps the natural speed |
+| `max_seconds` | `30` | Target loop length. Busy years speed up to fit, `0` keeps the natural speed |
 | `github_token` | `github.token` | Token for the GraphQL API |
 
 ### Private contributions

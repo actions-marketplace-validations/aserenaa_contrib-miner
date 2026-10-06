@@ -20,7 +20,7 @@ INTRO_MS = 600
 FINISHED_MINE_MS = 1000
 CARD_MS = 4000
 TWINKLE_EVERY_FRAMES = 40
-DEFAULT_MAX_SECONDS = 25
+DEFAULT_MAX_SECONDS = 30
 GIF_DELAY_UNIT_MS = 10
 KEEP_PREVIOUS_FRAME = 1
 
@@ -43,7 +43,7 @@ class Timing:
         return walk_frames * self.step_ms + mines * (self.wind_up_ms + self.strike_ms)
 
 
-FASTEST = Timing(step_ms=20, wind_up_ms=20, strike_ms=40)
+FASTEST = Timing(step_ms=40, wind_up_ms=40, strike_ms=60)
 MAX_CELLS_PER_STEP = 4
 
 
