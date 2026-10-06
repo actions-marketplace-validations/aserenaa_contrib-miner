@@ -192,5 +192,24 @@ class StatsTests(unittest.TestCase):
         self.assertIn(S.IDX["tunnel"], frames[-1].px)  # the card panel
 
 
+class ThemeTests(unittest.TestCase):
+    def test_themes_only_recolour_known_entries(self):
+        names = {name for name, _ in S.PALETTE}
+        for theme, overrides in S.THEMES.items():
+            self.assertLessEqual(set(overrides), names, theme)
+            self.assertEqual(len(S.palette_bytes(theme)), 3 * len(S.PALETTE))
+
+    def test_light_theme_renders_with_its_own_palette(self):
+        cal = sample_calendar("tester")
+        with tempfile.TemporaryDirectory() as tmp:
+            out = render_gif(cal, Path(tmp) / "light.gif", scale=1, theme="light")
+            first = Image.open(out).convert("RGB")
+        self.assertEqual(first.getpixel((0, 0)), tuple(bytes.fromhex(S.THEMES["light"]["bg"][1:])))
+
+    def test_unknown_theme_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError):
+            render_gif(sample_calendar("tester"), Path(tmp) / "x.gif", theme="neon")
+
+
 if __name__ == "__main__":
     unittest.main()

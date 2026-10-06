@@ -15,6 +15,8 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="contrib-miner", description=__doc__)
     p.add_argument("--user", help="GitHub login to render")
     p.add_argument("--output", default="dist/miner.gif", help="where to write the GIF")
+    p.add_argument("--theme", choices=["dark", "light"], default="dark", help="theme of --output (default dark)")
+    p.add_argument("--light-output", metavar="PATH", help="also write a light-theme GIF here, from the same data")
     p.add_argument("--scale", type=int, default=2, help="integer upscale factor (default 2)")
     p.add_argument(
         "--max-seconds",
@@ -49,7 +51,14 @@ def main(argv: list[str] | None = None) -> int:
             p.error("a token is required: pass --token or set GITHUB_TOKEN")
         cal = fetch_calendar(args.user, args.token)
 
-    out = render_gif(cal, args.output, scale=args.scale, max_seconds=args.max_seconds or None)
-    size_kb = out.stat().st_size / 1024
-    print(f"wrote {out} ({size_kb:.0f} KB, {len(cal.weeks)} weeks, {cal.total} contributions)", file=sys.stderr)
+    jobs = [(args.output, args.theme)]
+    if args.light_output:
+        jobs.append((args.light_output, "light"))
+    for path, theme in jobs:
+        out = render_gif(cal, path, scale=args.scale, max_seconds=args.max_seconds or None, theme=theme)
+        size_kb = out.stat().st_size / 1024
+        print(
+            f"wrote {out} ({theme}, {size_kb:.0f} KB, {len(cal.weeks)} weeks, {cal.total} contributions)",
+            file=sys.stderr,
+        )
     return 0

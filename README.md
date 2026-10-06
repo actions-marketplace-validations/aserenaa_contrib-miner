@@ -18,7 +18,10 @@ static. **contrib-miner** turns it into a tiny scene: a miner climbs down into y
 walks to every day you contributed and mines it out. The busier the day, the richer the ore.
 
 <p align="center">
-  <img src="docs/sample.gif" alt="An 8-bit miner climbing down into a contribution graph, walking through tunnels and striking coal, copper, gold and diamond ore from the side while a contribution counter climbs" width="864">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/sample-light.gif">
+    <img src="docs/sample.gif" alt="An 8-bit miner climbing down into a contribution graph, walking through tunnels and striking coal, copper, gold and diamond ore from the side while a contribution counter climbs" width="864">
+  </picture>
 </p>
 
 ## Features
@@ -30,6 +33,7 @@ walks to every day you contributed and mines it out. The busier the day, the ric
 - 📊 **A closing stats card** — total contributions, active days, days per ore, your best day and your longest streak.
 - ⏱️ **A loop that fits** — busy years speed up automatically, so the animation stays around 25 seconds.
 - 🪶 **Small** — each frame stores only the pixels that changed, so a full year is usually 100 to 250 KB.
+- 🌗 **Dark and light** — a night sky or a daytime one with clouds, switched by the viewer's GitHub theme.
 - 🔍 **Crisp at any size** — drawn at 1 pixel per sprite pixel and upscaled with nearest-neighbour sampling.
 - 🔒 **No servers, no secrets** — runs inside your own Actions with the default token, and publishes to a separate branch so your profile history stays clean.
 
@@ -61,6 +65,7 @@ jobs:
         with:
           github_user_name: ${{ github.repository_owner }}
           output: dist/miner.gif
+          light_output: dist/miner-light.gif
       # A single-commit orphan branch, force-pushed, so GIF history never piles up.
       - name: Publish to the output branch
         working-directory: dist
@@ -70,18 +75,23 @@ jobs:
           git init -q -b output
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add miner.gif
-          git commit -qm "Update miner.gif"
+          git add .
+          git commit -qm "Update miner GIFs"
           git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" output
 ```
 
 **2. Run it once** from the **Actions** tab (**Contrib miner → Run workflow**) so the `output` branch exists.
 
-**3. Embed the GIF** in your profile `README.md`:
+**3. Embed the GIF** in your profile `README.md`. GitHub shows the light version to visitors using the light theme:
 
-```markdown
-<img src="https://raw.githubusercontent.com/<you>/<you>/output/miner.gif" alt="My contributions over the last year, mined" width="864">
+```html
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/<you>/<you>/output/miner-light.gif">
+  <img src="https://raw.githubusercontent.com/<you>/<you>/output/miner.gif" alt="My contributions over the last year, mined" width="864">
+</picture>
 ```
+
+Only want one theme? Drop `light_output` and the `<source>` line.
 
 ### Inputs
 
@@ -89,6 +99,8 @@ jobs:
 |---|---|---|
 | `github_user_name` | repository owner | Login whose contributions are rendered |
 | `output` | `dist/miner.gif` | Where to write the GIF |
+| `theme` | `dark` | Theme of `output`: `dark` or `light` |
+| `light_output` | none | Also write a light-theme GIF here, from the same data |
 | `scale` | `2` | Integer upscale factor, 1 to 8 |
 | `max_seconds` | `25` | Target loop length. Busy years speed up to fit, `0` keeps the natural speed |
 | `github_token` | `github.token` | Token for the GraphQL API |

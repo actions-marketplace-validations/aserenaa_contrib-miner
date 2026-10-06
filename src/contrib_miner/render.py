@@ -129,9 +129,9 @@ class Canvas:
                     if bit == "#":
                         self.set(x + i * S.GLYPH_ADVANCE + dx, y + dy, c)
 
-    def to_image(self, scale: int) -> Image.Image:
+    def to_image(self, scale: int, theme: str = "dark") -> Image.Image:
         img = Image.frombytes("P", (self.w, self.h), bytes(self.px))
-        img.putpalette(S.palette_bytes())
+        img.putpalette(S.palette_bytes(theme))
         if scale > 1:
             img = img.resize((self.w * scale, self.h * scale), Image.Resampling.NEAREST)
         return img
@@ -187,8 +187,9 @@ def _ore_tile(level: int) -> tuple[list[str], dict[str, str]]:
 class Scene:
     """Holds the mine as a persistent canvas that only changes cell by cell."""
 
-    def __init__(self, cal: Calendar):
+    def __init__(self, cal: Calendar, theme: str = "dark"):
         self.cal = cal
+        self.theme = theme
         self.cols = len(cal.weeks)
         self.w = MARGIN_X * 2 + self.cols * S.TILE
         self.h = GRID_Y + ROWS * S.TILE + BOTTOM
@@ -196,6 +197,8 @@ class Scene:
         self.stars = [
             (rng.randrange(self.w), rng.randrange(1, GRASS_Y - 1), rng.random() < 0.3) for _ in range(self.w // 12)
         ]
+        # Clouds stay clear of the shaft on the left and the header text above.
+        self.clouds = [(rng.randrange(24, self.w - 10), rng.randrange(9, 13)) for _ in range(self.w // 70)]
         self.ore_tiles = {lvl: _ore_tile(lvl) for lvl in S.ORES}
         self.walked: set[tuple[int, int]] = set()
         self.mined: set[tuple[int, int]] = set()
@@ -219,6 +222,9 @@ class Scene:
         for y in range(GRID_Y, self.h, S.TILE):
             for x in range(0, self.w, S.TILE):
                 c.blit(S.DIRT, S.DIRT_KEY, x, y, flip=((x // S.TILE + y // S.TILE) % 2 == 1))
+        if self.theme == "light":
+            for x, y in self.clouds:
+                c.blit(S.CLOUD, S.CLOUD_KEY, x, y)
         for col in range(self.cols):
             for row in range(ROWS):
                 lvl = self.level(col, row)
@@ -243,13 +249,14 @@ class Scene:
 
     def frame(self, tick: int, counted: int, miner: tuple[int, int, list[str]], effects=()) -> Canvas:
         c = self.base.copy()
-        twinkle = tick // TWINKLE_EVERY
-        for i, (x, y, bright) in enumerate(self.stars):
-            if bright or (i + twinkle) % 5 != 0:
-                c.set(x, y, S.IDX["star_hi" if bright and twinkle % 2 else "star"])
+        if self.theme == "dark":
+            twinkle = tick // TWINKLE_EVERY
+            for i, (x, y, bright) in enumerate(self.stars):
+                if bright or (i + twinkle) % 5 != 0:
+                    c.set(x, y, S.IDX["star_hi" if bright and twinkle % 2 else "star"])
         c.text(self.cal.login, MARGIN_X, HEADER_Y, "text")
         right = f"{counted} CONTRIBUTIONS"
-        colour = "gold" if counted >= self.cal.total else "text_dim"
+        colour = "accent" if counted >= self.cal.total else "text_dim"
         c.text(right, self.w - MARGIN_X - S.text_width(right), HEADER_Y, colour)
         for x, y in effects:
             c.blit(S.SPARKLE, S.SPARKLE_KEY, x, y)
@@ -319,14 +326,16 @@ def draw_card(c: Canvas, stats: Stats) -> None:
                 x += len(text) * S.GLYPH_ADVANCE
 
 
-def render_frames(cal: Calendar, max_seconds: float | None = DEFAULT_MAX_SECONDS) -> tuple[list[Canvas], list[int]]:
+def render_frames(
+    cal: Calendar, max_seconds: float | None = DEFAULT_MAX_SECONDS, theme: str = "dark"
+) -> tuple[list[Canvas], list[int]]:
     steps = plan(cal)
     timing = choose_timing(
         moves=sum(s.kind != "mine" for s in steps),
         mines=sum(s.kind == "mine" for s in steps),
         max_seconds=max_seconds,
     )
-    scene = Scene(cal)
+    scene = Scene(cal, theme)
     frames: list[Canvas] = []
     durations: list[int] = []
     counted = 0
@@ -392,10 +401,16 @@ def _merge_duplicates(frames: list[Canvas], durations: list[int]) -> tuple[list[
 
 
 def render_gif(
-    cal: Calendar, path: str | Path, scale: int = 2, max_seconds: float | None = DEFAULT_MAX_SECONDS
+    cal: Calendar,
+    path: str | Path,
+    scale: int = 2,
+    max_seconds: float | None = DEFAULT_MAX_SECONDS,
+    theme: str = "dark",
 ) -> Path:
-    frames, durations = _merge_duplicates(*render_frames(cal, max_seconds))
-    images = [f.to_image(scale) for f in frames]
+    if theme not in S.THEMES:
+        raise ValueError(f"unknown theme {theme!r}; choose from {', '.join(S.THEMES)}")
+    frames, durations = _merge_duplicates(*render_frames(cal, max_seconds, theme))
+    images = [f.to_image(scale, theme) for f in frames]
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     # With optimize, Pillow crops each frame to the area that changed and makes

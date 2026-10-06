@@ -12,6 +12,12 @@ inputs:
   output:
     description: Path of the GIF to write.
     default: dist/miner.gif
+  theme:
+    description: Theme of the main GIF, dark or light.
+    default: dark
+  light_output:
+    description: Optional path for a second, light-theme GIF rendered from the same data.
+    default: ""
   scale:
     description: Integer upscale factor for crisp pixels (1-8).
     default: "2"
@@ -40,10 +46,15 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
     - name: Render GIF
       shell: bash
-      run: contrib-miner --user "$USER_NAME" --output "$OUTPUT" --scale "$SCALE" --max-seconds "$MAX_SECONDS"
+      run: |
+        args=(--user "$USER_NAME" --output "$OUTPUT" --theme "$THEME" --scale "$SCALE" --max-seconds "$MAX_SECONDS")
+        if [ -n "$LIGHT_OUTPUT" ]; then args+=(--light-output "$LIGHT_OUTPUT"); fi
+        contrib-miner "${args[@]}"
       env:
         USER_NAME: ${{ inputs.github_user_name }}
         OUTPUT: ${{ inputs.output }}
+        THEME: ${{ inputs.theme }}
+        LIGHT_OUTPUT: ${{ inputs.light_output }}
         SCALE: ${{ inputs.scale }}
         MAX_SECONDS: ${{ inputs.max_seconds }}
         GITHUB_TOKEN: ${{ inputs.github_token }}

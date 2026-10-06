@@ -34,6 +34,7 @@ PALETTE: list[tuple[str, str]] = [
     ("pants", "#3b5dc9"),
     ("boots", "#333c57"),
     ("spark", "#ffffff"),
+    ("accent", "#ffcd75"),  # the finished contribution counter
     # Reserved: marks "unchanged since last frame" in delta-encoded GIF frames.
     ("clear", "#ff00ff"),
 ]
@@ -41,10 +42,25 @@ PALETTE: list[tuple[str, str]] = [
 IDX = {name: i for i, (name, _) in enumerate(PALETTE)}
 
 
-def palette_bytes() -> bytes:
+# Themes only recolour the sky and the header; the mine looks the same in both.
+THEMES: dict[str, dict[str, str]] = {
+    "dark": {},
+    "light": {
+        "bg": "#a6dcf7",
+        "star": "#ffffff",  # cloud body
+        "star_hi": "#d9f0fc",  # cloud shading
+        "text": "#1a1c2c",
+        "text_dim": "#333c57",
+        "accent": "#b13e53",
+    },
+}
+
+
+def palette_bytes(theme: str = "dark") -> bytes:
+    overrides = THEMES[theme]
     out = bytearray()
-    for _, hexcode in PALETTE:
-        out += bytes.fromhex(hexcode[1:])
+    for name, hexcode in PALETTE:
+        out += bytes.fromhex(overrides.get(name, hexcode)[1:])
     return bytes(out)
 
 
@@ -111,6 +127,14 @@ GEM = [
     ".o.",
 ]
 
+# Daytime sky decoration for the light theme.
+CLOUD = [
+    "..hh...",
+    ".hcchh.",
+    "hccccch",
+]
+CLOUD_KEY = {"c": "star", "h": "star_hi"}
+
 # Walked-through dirt: a darker passage.
 PATH = [
     "eeeeeeee",
@@ -144,7 +168,7 @@ MINER_KEY = {
     "y": "gold",
     "w": "gold_hi",
     "k": "skin",
-    "e": "bg",
+    "e": "coal",
     "r": "shirt",
     "p": "pants",
     "o": "boots",

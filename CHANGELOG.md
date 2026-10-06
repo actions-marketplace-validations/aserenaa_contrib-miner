@@ -12,6 +12,8 @@ All notable changes to this project are documented here. The format follows
   shrink first, then the miner walks several cells per frame, and very busy years skip the wind-up.
 - A closing stats card: total contributions, active days, days per ore, best day and longest
   streak.
+- A light theme with a daytime sky. `theme` picks the theme of `output`, and `light_output`
+  renders a light GIF alongside it for a `<picture>` that follows the viewer's GitHub theme.
 
 ## [1.1.0] - 2026-10-06
 
