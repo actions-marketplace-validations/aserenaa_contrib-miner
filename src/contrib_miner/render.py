@@ -31,6 +31,7 @@ class Timing:
     wind_up_ms: int = 50
     strike_ms: int = 70
     cells_per_step: int = 1
+    walks_inside_strikes: bool = False
 
     @property
     def skips_wind_up(self) -> bool:
@@ -38,7 +39,7 @@ class Timing:
 
     def mining_ms(self, moves: int, mines: int) -> int:
         walk_frames = math.ceil(moves / self.cells_per_step)
-        if self.skips_wind_up:
+        if self.walks_inside_strikes:
             walk_frames = max(0, walk_frames - mines)
         return walk_frames * self.step_ms + mines * (self.wind_up_ms + self.strike_ms)
 
@@ -55,8 +56,9 @@ def _scaled_delay(ms: float, fastest: int) -> int:
 def choose_timing(moves: int, mines: int, max_seconds: float | None) -> Timing:
     """Pick the slowest, smoothest timing whose loop fits in max_seconds.
 
-    Delays shrink down to FASTEST, then the miner walks several cells per
-    frame, and very busy years finally skip the wind-up frame.
+    Delays shrink down to FASTEST, then the wind-up frame goes, then the
+    miner walks several cells per frame. Only the busiest years lose the
+    walking frames entirely.
     """
     base = Timing()
     if not max_seconds:
@@ -71,10 +73,12 @@ def choose_timing(moves: int, mines: int, max_seconds: float | None) -> Timing:
         wind_up_ms=_scaled_delay(base.wind_up_ms * factor, FASTEST.wind_up_ms),
         strike_ms=_scaled_delay(base.strike_ms * factor, FASTEST.strike_ms),
     )
+    if timing.mining_ms(moves, mines) > budget:
+        timing = replace(timing, wind_up_ms=0)
     while timing.mining_ms(moves, mines) > budget and timing.cells_per_step < MAX_CELLS_PER_STEP:
         timing = replace(timing, cells_per_step=timing.cells_per_step + 1)
     if timing.mining_ms(moves, mines) > budget:
-        timing = replace(timing, wind_up_ms=0)
+        timing = replace(timing, walks_inside_strikes=True)
     return timing
 
 
@@ -367,10 +371,11 @@ def render_frames(
                 show_walk()
         else:
             ox, oy = scene.cell_xy(step.col, step.row)
-            if timing.skips_wind_up:
+            if timing.walks_inside_strikes:
                 cells_walked_unshown = 0
             else:
                 show_walk()
+            if not timing.skips_wind_up:
                 push(S.MINER_UP, timing.wind_up_ms, effects=[(ox + 2, oy + 2)])
             scene.mine(step.col, step.row)
             counted += cal.weeks[step.col][step.row].count

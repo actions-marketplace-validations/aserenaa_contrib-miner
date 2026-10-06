@@ -177,6 +177,14 @@ class TimingTests(unittest.TestCase):
                 durations = render_frames(cal, max_seconds=budget)[1]
                 self.assertGreaterEqual(min(durations), FASTEST.step_ms)
 
+    def test_busy_years_still_walk(self):
+        timing = choose_timing(moves=500, mines=230, max_seconds=30)
+        self.assertFalse(timing.walks_inside_strikes)
+        steps = plan(sample_calendar("tester"))
+        mines = sum(step.kind == "mine" for step in steps)
+        sample_timing = choose_timing(moves=len(steps) - mines, mines=mines, max_seconds=30)
+        self.assertFalse(sample_timing.walks_inside_strikes)
+
     def test_uncapped_loop_is_longer(self):
         cal = sample_calendar("tester")
         capped = sum(render_frames(cal, max_seconds=20)[1])
