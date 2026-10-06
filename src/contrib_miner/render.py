@@ -117,7 +117,7 @@ class Scene:
         return c
 
     def header(self, c: Canvas, mined: int) -> None:
-        c.text(f"@{self.cal.login}", MARGIN_X, HEADER_Y, "text")
+        c.text(self.cal.login, MARGIN_X, HEADER_Y, "text")
         right = f"{mined} CONTRIBUTIONS"
         colour = "gold" if mined >= self.cal.total else "text_dim"
         c.text(right, self.w - MARGIN_X - S.text_width(right), HEADER_Y, colour)
