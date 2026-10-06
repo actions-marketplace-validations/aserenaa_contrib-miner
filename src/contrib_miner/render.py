@@ -254,7 +254,8 @@ class Scene:
             for i, (x, y, bright) in enumerate(self.stars):
                 if bright or (i + twinkle) % 5 != 0:
                     c.set(x, y, S.IDX["star_hi" if bright and twinkle % 2 else "star"])
-        c.text(self.cal.login, MARGIN_X, HEADER_Y, "text")
+        title = f"{self.cal.login} {self.cal.year}" if self.cal.year else self.cal.login
+        c.text(title, MARGIN_X, HEADER_Y, "text")
         right = f"{counted} CONTRIBUTIONS"
         colour = "accent" if counted >= self.cal.total else "text_dim"
         c.text(right, self.w - MARGIN_X - S.text_width(right), HEADER_Y, colour)

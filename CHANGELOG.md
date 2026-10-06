@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows
   streak.
 - A light theme with a daytime sky. `theme` picks the theme of `output`, and `light_output`
   renders a light GIF alongside it for a `<picture>` that follows the viewer's GitHub theme.
+- `year` input and `--year` flag to mine a calendar year instead of the last twelve months.
 
 ## [1.1.0] - 2026-10-06
 

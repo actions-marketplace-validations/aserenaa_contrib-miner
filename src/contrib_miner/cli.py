@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import sys
@@ -14,6 +15,7 @@ from .render import DEFAULT_MAX_SECONDS, render_gif
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="contrib-miner", description=__doc__)
     p.add_argument("--user", help="GitHub login to render")
+    p.add_argument("--year", type=int, help="a calendar year instead of the last twelve months")
     p.add_argument("--output", default="dist/miner.gif", help="where to write the GIF")
     p.add_argument("--theme", choices=["dark", "light"], default="dark", help="theme of --output (default dark)")
     p.add_argument("--light-output", metavar="PATH", help="also write a light-theme GIF here, from the same data")
@@ -36,20 +38,24 @@ def main(argv: list[str] | None = None) -> int:
 
     if not 1 <= args.scale <= 8:
         p.error("--scale must be between 1 and 8")
+    this_year = datetime.date.today().year
+    if args.year is not None and not 2008 <= args.year <= this_year:
+        p.error(f"--year must be between 2008 and {this_year}")
     if args.max_seconds < 0:
         p.error("--max-seconds must be 0 or more")
 
     if args.sample:
         cal = sample_calendar(args.user or "octocat")
+        cal.year = args.year
     elif args.from_json:
         with open(args.from_json, encoding="utf-8") as fh:
-            cal = parse_calendar(json.load(fh))
+            cal = parse_calendar(json.load(fh), args.year)
     else:
         if not args.user:
             p.error("--user is required unless --sample or --from-json is given")
         if not args.token:
             p.error("a token is required: pass --token or set GITHUB_TOKEN")
-        cal = fetch_calendar(args.user, args.token)
+        cal = fetch_calendar(args.user, args.token, year=args.year)
 
     jobs = [(args.output, args.theme)]
     if args.light_output:

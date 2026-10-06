@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image, ImageSequence
 
 from contrib_miner import sprites as S
-from contrib_miner.fetch import Day, parse_calendar, sample_calendar
+from contrib_miner.fetch import Day, build_query, parse_calendar, sample_calendar, year_range
 from contrib_miner.render import (
     FLOOR,
     GRID_Y,
@@ -55,6 +55,13 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(cal.total, 9)
         self.assertEqual(cal.weeks[0][:6], [None] * 6)
         self.assertEqual(cal.weeks[0][6].level, 4)
+
+    def test_year_query(self):
+        self.assertNotIn("$from", build_query(None))
+        self.assertIn("contributionsCollection(from: $from, to: $to)", build_query(2025))
+        self.assertEqual(year_range(2025), {"from": "2025-01-01T00:00:00Z", "to": "2025-12-31T23:59:59Z"})
+        cal = parse_calendar(payload([]), year=2025)
+        self.assertEqual(cal.year, 2025)
 
     def test_graphql_errors_raise(self):
         with self.assertRaisesRegex(RuntimeError, "bad login"):

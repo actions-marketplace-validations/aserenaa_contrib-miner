@@ -99,6 +99,7 @@ Only want one theme? Drop `light_output` and the `<source>` line.
 |---|---|---|
 | `github_user_name` | repository owner | Login whose contributions are rendered |
 | `output` | `dist/miner.gif` | Where to write the GIF |
+| `year` | none | A calendar year such as `2025`; empty means the last twelve months |
 | `theme` | `dark` | Theme of `output`: `dark` or `light` |
 | `light_output` | none | Also write a light-theme GIF here, from the same data |
 | `scale` | `2` | Integer upscale factor, 1 to 8 |

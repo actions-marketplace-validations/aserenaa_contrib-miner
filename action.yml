@@ -9,6 +9,9 @@ inputs:
   github_user_name:
     description: GitHub login whose contributions are rendered.
     default: ${{ github.repository_owner }}
+  year:
+    description: A calendar year such as 2025. Empty means the last twelve months.
+    default: ""
   output:
     description: Path of the GIF to write.
     default: dist/miner.gif
@@ -49,11 +52,13 @@ runs:
       run: |
         args=(--user "$USER_NAME" --output "$OUTPUT" --theme "$THEME" --scale "$SCALE" --max-seconds "$MAX_SECONDS")
         if [ -n "$LIGHT_OUTPUT" ]; then args+=(--light-output "$LIGHT_OUTPUT"); fi
+        if [ -n "$YEAR" ]; then args+=(--year "$YEAR"); fi
         contrib-miner "${args[@]}"
       env:
         USER_NAME: ${{ inputs.github_user_name }}
         OUTPUT: ${{ inputs.output }}
         THEME: ${{ inputs.theme }}
+        YEAR: ${{ inputs.year }}
         LIGHT_OUTPUT: ${{ inputs.light_output }}
         SCALE: ${{ inputs.scale }}
         MAX_SECONDS: ${{ inputs.max_seconds }}

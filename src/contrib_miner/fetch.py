@@ -11,10 +11,10 @@ import requests
 GRAPHQL_URL = "https://api.github.com/graphql"
 
 QUERY = """
-query($login: String!) {
+query($login: String!%(params)s) {
   user(login: $login) {
     login
-    contributionsCollection {
+    contributionsCollection%(args)s {
       contributionCalendar {
         totalContributions
         weeks {
@@ -51,12 +51,23 @@ class Day:
 class Calendar:
     login: str
     total: int
+    year: int | None = None  # None means the last twelve months
     # Each week has 7 slots indexed by weekday (0 = Sunday). Days outside the
     # one-year window are None, which happens in the first and last week.
     weeks: list[list[Day | None]] = field(default_factory=list)
 
 
-def parse_calendar(payload: dict) -> Calendar:
+def build_query(year: int | None) -> str:
+    if year is None:
+        return QUERY % {"params": "", "args": ""}
+    return QUERY % {"params": ", $from: DateTime!, $to: DateTime!", "args": "(from: $from, to: $to)"}
+
+
+def year_range(year: int) -> dict[str, str]:
+    return {"from": f"{year}-01-01T00:00:00Z", "to": f"{year}-12-31T23:59:59Z"}
+
+
+def parse_calendar(payload: dict, year: int | None = None) -> Calendar:
     """Turn a raw GraphQL response body into a Calendar."""
     if payload.get("errors"):
         messages = "; ".join(e.get("message", "?") for e in payload["errors"])
@@ -75,18 +86,19 @@ def parse_calendar(payload: dict) -> Calendar:
                 level=LEVELS.get(d["contributionLevel"], 0),
             )
         weeks.append(slots)
-    return Calendar(login=user["login"], total=cal["totalContributions"], weeks=weeks)
+    return Calendar(login=user["login"], total=cal["totalContributions"], weeks=weeks, year=year)
 
 
-def fetch_calendar(login: str, token: str, timeout: float = 30) -> Calendar:
+def fetch_calendar(login: str, token: str, year: int | None = None, timeout: float = 30) -> Calendar:
+    variables = {"login": login, **(year_range(year) if year else {})}
     resp = requests.post(
         GRAPHQL_URL,
-        json={"query": QUERY, "variables": {"login": login}},
+        json={"query": build_query(year), "variables": variables},
         headers={"Authorization": f"bearer {token}", "User-Agent": "contrib-miner"},
         timeout=timeout,
     )
     resp.raise_for_status()
-    return parse_calendar(resp.json())
+    return parse_calendar(resp.json(), year)
 
 
 def sample_calendar(login: str = "octocat", seed: int = 7, end: date | None = None) -> Calendar:
