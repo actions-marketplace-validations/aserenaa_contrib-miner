@@ -18,9 +18,6 @@ inputs:
   theme:
     description: Theme of the main GIF, dark or light.
     default: dark
-  season:
-    description: Seasonal dressing - none, auto (Halloween or Christmas from the run date), halloween or christmas.
-    default: none
   light_output:
     description: Optional path for a second, light-theme GIF rendered from the same data.
     default: ""
@@ -53,7 +50,7 @@ runs:
     - name: Render GIF
       shell: bash
       run: |
-        args=(--user "$USER_NAME" --output "$OUTPUT" --theme "$THEME" --season "$SEASON" --scale "$SCALE" --max-seconds "$MAX_SECONDS")
+        args=(--user "$USER_NAME" --output "$OUTPUT" --theme "$THEME" --scale "$SCALE" --max-seconds "$MAX_SECONDS")
         if [ -n "$LIGHT_OUTPUT" ]; then args+=(--light-output "$LIGHT_OUTPUT"); fi
         if [ -n "$YEAR" ]; then args+=(--year "$YEAR"); fi
         contrib-miner "${args[@]}"
@@ -61,7 +58,6 @@ runs:
         USER_NAME: ${{ inputs.github_user_name }}
         OUTPUT: ${{ inputs.output }}
         THEME: ${{ inputs.theme }}
-        SEASON: ${{ inputs.season }}
         YEAR: ${{ inputs.year }}
         LIGHT_OUTPUT: ${{ inputs.light_output }}
         SCALE: ${{ inputs.scale }}

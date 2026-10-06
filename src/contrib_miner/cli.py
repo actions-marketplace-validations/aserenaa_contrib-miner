@@ -22,8 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--season",
         choices=SEASON_CHOICES,
-        default="none",
-        help="seasonal dressing; auto picks Halloween or Christmas from today's date (default none)",
+        default="auto",
+        help=argparse.SUPPRESS,
     )
     p.add_argument("--light-output", metavar="PATH", help="also write a light-theme GIF here, from the same data")
     p.add_argument("--scale", type=int, default=2, help="integer upscale factor (default 2)")

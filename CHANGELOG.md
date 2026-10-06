@@ -8,9 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- `season` input and `--season` flag. `auto` dresses the sky, the surface and the miner's hat for
-  Halloween (October 15 to November 1) and Christmas (December 1 to 26); the mine itself never
-  changes. `halloween` and `christmas` force a season, and `none`, the default, keeps the usual look.
+- A small surprise at certain times of the year.
 
 ## [1.2.0] - 2026-10-06
 
