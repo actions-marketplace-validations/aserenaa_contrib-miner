@@ -1,3 +1,3 @@
 """Render a GitHub contribution calendar as an 8-bit mining animation."""
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"

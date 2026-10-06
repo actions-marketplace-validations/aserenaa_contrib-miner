@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-10-06
+
+### Fixed
+
+- Busy years keep the miner walking between ores instead of jumping from one to the next.
+
 ## [1.3.1] - 2026-10-06
 
 ### Fixed
@@ -54,7 +60,8 @@ First public release.
 - `contrib-miner` command line tool with `--sample` and `--from-json` for offline previews.
 - Delta-encoded frames that keep a full year at about 100 KB at the default 2x scale.
 
-[Unreleased]: https://github.com/aserenaa/contrib-miner/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/aserenaa/contrib-miner/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/aserenaa/contrib-miner/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/aserenaa/contrib-miner/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/aserenaa/contrib-miner/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/aserenaa/contrib-miner/compare/v1.1.0...v1.2.0
