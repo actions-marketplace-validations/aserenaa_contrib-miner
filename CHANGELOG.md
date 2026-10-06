@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-06
+
+### Fixed
+
+- Busy years no longer stutter. Frames never play faster than 40 ms; busy years save time by
+  walking more cells per frame instead. The default `max_seconds` is now 30.
+
 ## [1.3.0] - 2026-10-06
 
 ### Added
@@ -47,7 +54,8 @@ First public release.
 - `contrib-miner` command line tool with `--sample` and `--from-json` for offline previews.
 - Delta-encoded frames that keep a full year at about 100 KB at the default 2x scale.
 
-[Unreleased]: https://github.com/aserenaa/contrib-miner/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/aserenaa/contrib-miner/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/aserenaa/contrib-miner/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/aserenaa/contrib-miner/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/aserenaa/contrib-miner/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/aserenaa/contrib-miner/compare/v1.0.0...v1.1.0
