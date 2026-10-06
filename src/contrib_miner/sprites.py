@@ -95,16 +95,6 @@ ORES = {
     4: ("diamond", "diamond_hi"),
 }
 
-TUNNEL = [
-    "eeeeeeee",
-    "tttttttt",
-    "ttettttt",
-    "tttttttt",
-    "tttttett",
-    "tttttttt",
-    "tettttte",
-    "tttttttt",
-]
 TUNNEL_KEY = {"t": "tunnel", "e": "tunnel_edge"}
 
 SPARKLE = [
@@ -114,13 +104,34 @@ SPARKLE = [
 ]
 SPARKLE_KEY = {"x": "gold_hi", "w": "spark"}
 
-GEM = [
-    ".h.",
-    "hoo",
-    ".o.",
+# Walked-through dirt: a darker passage.
+PATH = [
+    "eeeeeeee",
+    "DDDDDDDD",
+    "DDdDDDDD",
+    "DDDDDDDD",
+    "DDDDDdDD",
+    "DDDDDDDD",
+    "DdDDDDDD",
+    "DDDDDDdD",
+]
+PATH_KEY = {"D": "dirt_dark", "d": "dirt", "e": "tunnel_edge"}
+
+# A mined ore: an empty tunnel with a little rubble in the ore's colour,
+# so the finished mine still shows the shape of the contribution graph.
+MINED = [
+    "eeeeeeee",
+    "tttttttt",
+    "tttttttt",
+    "tttttttt",
+    "tttttttt",
+    "tttttttt",
+    "tthtttot",
+    "toohthoo",
 ]
 
-# --- Miner (faces right, 12x11) ---------------------------------------------
+# --- Miner (faces right, 10x8, fits in one 8x8 tunnel) -----------------------
+# Columns 8-9 reach into the next tile, so the pickaxe hits the ore beside him.
 
 MINER_KEY = {
     "y": "gold",
@@ -134,32 +145,32 @@ MINER_KEY = {
     "H": "text_dim",
 }
 
+# Pickaxe raised: used for walking (two leg poses) and the wind-up.
 MINER_UP = [
-    "......HHHHH.",
-    ".....H..b..H",
-    "..yyyy..b...",
-    ".yyyyyw.b...",
-    "..kkkk..b...",
-    "..kkek..b...",
-    ".rrrrrrkb...",
-    ".rrrrrr.....",
-    "..pppp......",
-    "..p..p......",
-    ".oo..oo.....",
+    ".yyy..HHH.",
+    "yyyyw.b..H",
+    ".kke..b...",
+    ".kkk.b....",
+    "rrrrkb....",
+    ".rrr......",
+    ".ppp......",
+    ".o.o......",
+]
+MINER_STEP = MINER_UP[:6] + [
+    ".pp.p.....",
+    "o...o.....",
 ]
 
+# Pickaxe swung into the tile on the right.
 MINER_DOWN = [
-    "............",
-    "............",
-    "..yyyy......",
-    ".yyyyyw...H.",
-    "..kkkk.....H",
-    "..kkek.....H",
-    ".rrrrrrkbbbH",
-    ".rrrrrr....H",
-    "..pppp.....H",
-    "..p..p....H.",
-    ".oo..oo.....",
+    ".yyy......",
+    "yyyyw.....",
+    ".kke....H.",
+    ".kkk.....H",
+    "rrrrkbbbbH",
+    ".rrr.....H",
+    ".ppp....H.",
+    ".o.o......",
 ]
 
 # --- 3x5 pixel font -----------------------------------------------------------

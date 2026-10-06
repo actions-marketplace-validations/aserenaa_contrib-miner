@@ -9,6 +9,11 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - The header shows the login without an `@` prefix.
+- The miner now climbs down a shaft and walks through the mine, striking each ore from the side
+  instead of digging a whole week from the surface. Walked dirt becomes a passage, and mined ore
+  leaves a tunnel with rubble in its colour, so the final frame still shows the graph.
+- GIF frames are cropped to the area that changed, which keeps the longer animation small.
+- The offline sample calendar is a little less busy, so the README demo loops sooner.
 
 ## [1.0.0] - 2026-10-06
 

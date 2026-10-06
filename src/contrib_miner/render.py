@@ -1,23 +1,39 @@
-"""Turn a Calendar into an animated GIF of a miner digging up contributions."""
+"""Turn a Calendar into an animated GIF of a miner digging up contributions.
+
+The miner climbs down a shaft on the left and works through the year one week
+(column) at a time. He always stands in the column to the left of the ores he
+is mining and swings at them from the side, walking up and down to reach each
+one. Dirt he walks through becomes a passage; mined ore leaves a tunnel with a
+little rubble, so the finished mine still shows the contribution graph.
+"""
 
 from __future__ import annotations
 
 import random
-from itertools import pairwise
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from PIL import Image
 
 from . import sprites as S
 from .fetch import Calendar
 
-MARGIN_X = 8
+MARGIN_X = 8  # one tile of dirt on each side; the left one holds the entry shaft
 HEADER_Y = 3
-MINER_Y = 12
-GRASS_Y = 23
-GRID_Y = 26
+GRASS_Y = 18
+GRID_Y = 21
 BOTTOM = 4
 ROWS = 7
+SURFACE_Y = GRASS_Y - S.TILE  # where the miner stands before climbing down
+
+# Frame timings in milliseconds. GIF stores delays in 10 ms units, so keep multiples of 10.
+INTRO_MS = 600
+STEP_MS = 40
+WIND_UP_MS = 50
+STRIKE_MS = 70
+TWINKLE_EVERY = 40  # frames; star changes touch the whole sky, so keep them rare
+OUTRO_MS = 3000
 
 
 class Canvas:
@@ -66,6 +82,44 @@ class Canvas:
         return img
 
 
+@dataclass(frozen=True)
+class Step:
+    """One action of the miner. For "enter" and "move", (col, row) is where he
+    ends up. For "mine", it is the ore he strikes from the cell to its left."""
+
+    kind: Literal["enter", "move", "mine"]
+    col: int
+    row: int
+
+
+def _ore_rows(week) -> list[int]:
+    return [row for row, day in enumerate(week) if day is not None and day.level > 0]
+
+
+def plan(cal: Calendar) -> list[Step]:
+    """Plan a route that mines every ore from its left-hand side."""
+    steps = [Step("enter", -1, 0)]
+    col, row = -1, 0
+    for target, week in enumerate(cal.weeks):
+        # Stay one column behind the column being mined. Everything in the
+        # column he walks into was already mined or is plain dirt.
+        while col < target - 1:
+            col += 1
+            steps.append(Step("move", col, row))
+        ores = _ore_rows(week)
+        if not ores:
+            continue
+        # Sweep the column starting from whichever end is closer.
+        if abs(row - ores[-1]) < abs(row - ores[0]):
+            ores.reverse()
+        for ore_row in ores:
+            while row != ore_row:
+                row += 1 if ore_row > row else -1
+                steps.append(Step("move", col, row))
+            steps.append(Step("mine", target, ore_row))
+    return steps
+
+
 def _ore_tile(level: int) -> tuple[list[str], dict[str, str]]:
     ore, hi = S.ORES[level]
     rows = [
@@ -76,6 +130,8 @@ def _ore_tile(level: int) -> tuple[list[str], dict[str, str]]:
 
 
 class Scene:
+    """Holds the mine as a persistent canvas that only changes cell by cell."""
+
     def __init__(self, cal: Calendar):
         self.cal = cal
         self.cols = len(cal.weeks)
@@ -83,120 +139,108 @@ class Scene:
         self.h = GRID_Y + ROWS * S.TILE + BOTTOM
         rng = random.Random(cal.login)
         self.stars = [
-            (rng.randrange(self.w), rng.randrange(1, GRASS_Y - 2), rng.random() < 0.3) for _ in range(self.w // 12)
+            (rng.randrange(self.w), rng.randrange(1, GRASS_Y - 1), rng.random() < 0.3) for _ in range(self.w // 12)
         ]
         self.ore_tiles = {lvl: _ore_tile(lvl) for lvl in S.ORES}
+        self.walked: set[tuple[int, int]] = set()
+        self.mined: set[tuple[int, int]] = set()
+        self.base = self._draw_base()
 
-    def tile_xy(self, col: int, row: int) -> tuple[int, int]:
+    def cell_xy(self, col: int, row: int) -> tuple[int, int]:
         return MARGIN_X + col * S.TILE, GRID_Y + row * S.TILE
 
-    def background(self, dug: set[tuple[int, int]], twinkle: int) -> Canvas:
+    def level(self, col: int, row: int) -> int:
+        if 0 <= col < self.cols:
+            day = self.cal.weeks[col][row]
+            return day.level if day is not None else 0
+        return 0
+
+    def _draw_base(self) -> Canvas:
         c = Canvas(self.w, self.h, S.IDX["bg"])
-        twinkle //= 6
-        for i, (x, y, bright) in enumerate(self.stars):
-            on = bright or (i + twinkle) % 5 != 0
-            if on:
-                c.set(x, y, S.IDX["star_hi" if bright and twinkle % 2 else "star"])
-        # Grass strip with a little texture.
         c.rect(0, GRASS_Y, self.w, 2, S.IDX["grass"])
         c.rect(0, GRASS_Y + 2, self.w, 1, S.IDX["grass_dark"])
         for x in range(0, self.w, 5):
             c.set(x + (x // 5) % 3, GRASS_Y, S.IDX["grass_hi"])
-        # Underground: side margins and bottom are plain dirt.
         for y in range(GRID_Y, self.h, S.TILE):
             for x in range(0, self.w, S.TILE):
                 c.blit(S.DIRT, S.DIRT_KEY, x, y, flip=((x // S.TILE + y // S.TILE) % 2 == 1))
-        for col, week in enumerate(self.cal.weeks):
-            for row, day in enumerate(week):
-                x, y = self.tile_xy(col, row)
-                if (col, row) in dug:
-                    c.blit(S.TUNNEL, S.TUNNEL_KEY, x, y)
-                elif day is not None and day.level > 0:
-                    rows, key = self.ore_tiles[day.level]
-                    c.blit(rows, key, x, y)
+        for col in range(self.cols):
+            for row in range(ROWS):
+                lvl = self.level(col, row)
+                if lvl:
+                    rows, key = self.ore_tiles[lvl]
+                    c.blit(rows, key, *self.cell_xy(col, row))
         return c
 
-    def header(self, c: Canvas, mined: int) -> None:
-        c.text(self.cal.login, MARGIN_X, HEADER_Y, "text")
-        right = f"{mined} CONTRIBUTIONS"
-        colour = "gold" if mined >= self.cal.total else "text_dim"
-        c.text(right, self.w - MARGIN_X - S.text_width(right), HEADER_Y, colour)
+    def open_shaft(self) -> None:
+        self.base.rect(0, GRASS_Y, S.TILE, GRID_Y - GRASS_Y, S.IDX["tunnel"])
 
-    def miner(self, c: Canvas, col: int, down: bool) -> None:
-        # Place the miner so the pickaxe head lands over the column centre.
-        x = MARGIN_X + col * S.TILE - 7
-        c.blit(S.MINER_DOWN if down else S.MINER_UP, S.MINER_KEY, x, MINER_Y)
+    def walk_into(self, col: int, row: int) -> None:
+        if (col, row) in self.walked or (col, row) in self.mined:
+            return
+        self.walked.add((col, row))
+        self.base.blit(S.PATH, S.PATH_KEY, *self.cell_xy(col, row))
+
+    def mine(self, col: int, row: int) -> None:
+        ore, hi = S.ORES[self.level(col, row)]
+        self.mined.add((col, row))
+        self.base.blit(S.MINED, {**S.TUNNEL_KEY, "o": ore, "h": hi}, *self.cell_xy(col, row))
+
+    def frame(self, tick: int, counted: int, miner: tuple[int, int, list[str]], effects=()) -> Canvas:
+        c = self.base.copy()
+        twinkle = tick // TWINKLE_EVERY
+        for i, (x, y, bright) in enumerate(self.stars):
+            if bright or (i + twinkle) % 5 != 0:
+                c.set(x, y, S.IDX["star_hi" if bright and twinkle % 2 else "star"])
+        c.text(self.cal.login, MARGIN_X, HEADER_Y, "text")
+        right = f"{counted} CONTRIBUTIONS"
+        colour = "gold" if counted >= self.cal.total else "text_dim"
+        c.text(right, self.w - MARGIN_X - S.text_width(right), HEADER_Y, colour)
+        for x, y in effects:
+            c.blit(S.SPARKLE, S.SPARKLE_KEY, x, y)
+        x, y, pose = miner
+        c.blit(pose, S.MINER_KEY, x, y)
+        return c
 
 
 def render_frames(cal: Calendar) -> tuple[list[Canvas], list[int]]:
     scene = Scene(cal)
     frames: list[Canvas] = []
     durations: list[int] = []
-    dug: set[tuple[int, int]] = set()
-    mined = 0
-    tick = 0
+    counted = 0
+    x, y = 0, SURFACE_Y
+    stride = 0
 
-    def push(canvas: Canvas, ms: int) -> None:
-        nonlocal tick
-        frames.append(canvas)
+    def push(pose: list[str], ms: int, effects=()) -> None:
+        frames.append(scene.frame(len(frames), counted, (x, y, pose), effects))
         durations.append(ms)
-        tick += 1
 
-    # Intro: miner stands at the start.
-    for _ in range(4):
-        c = scene.background(dug, tick)
-        scene.header(c, mined)
-        scene.miner(c, 0, down=False)
-        push(c, 150)
+    def walk(tx: int, ty: int) -> None:
+        # One frame per cell, alternating legs.
+        nonlocal x, y, stride
+        x, y = tx, ty
+        stride += 1
+        push(S.MINER_STEP if stride % 2 else S.MINER_UP, STEP_MS)
 
-    for col, week in enumerate(cal.weeks):
-        ores = [(row, d) for row, d in enumerate(week) if d is not None and d.level > 0]
-        if not ores:
-            c = scene.background(dug, tick)
-            scene.header(c, mined)
-            scene.miner(c, col, down=False)
-            push(c, 60)
-            continue
+    push(S.MINER_UP, INTRO_MS)
+    for step in plan(cal):
+        if step.kind == "enter":
+            scene.open_shaft()
+            scene.walk_into(step.col, step.row)
+            walk(*scene.cell_xy(step.col, step.row))
+        elif step.kind == "move":
+            scene.walk_into(step.col, step.row)
+            walk(*scene.cell_xy(step.col, step.row))
+        else:
+            ox, oy = scene.cell_xy(step.col, step.row)
+            push(S.MINER_UP, WIND_UP_MS, effects=[(ox + 2, oy + 2)])
+            scene.mine(step.col, step.row)
+            counted += cal.weeks[step.col][step.row].count
+            push(S.MINER_DOWN, STRIKE_MS, effects=[(ox + 4, oy + 1)])
 
-        # Swing up: ores in this column sparkle.
-        c = scene.background(dug, tick)
-        for row, _ in ores:
-            x, y = scene.tile_xy(col, row)
-            c.blit(S.SPARKLE, S.SPARKLE_KEY, x + 2 + (row % 2) * 2, y + 2)
-        scene.header(c, mined)
-        scene.miner(c, col, down=False)
-        push(c, 80)
-
-        # Swing down: column is dug out and the best gem pops up.
-        dug.update((col, row) for row, _ in ores)
-        mined += sum(d.count for _, d in ores)
-        best = max(d.level for _, d in ores)
-        ore, hi = S.ORES[best]
-        c = scene.background(dug, tick)
-        scene.header(c, mined)
-        scene.miner(c, col, down=True)
-        gx = MARGIN_X + col * S.TILE + 2
-        c.blit(S.GEM, {"o": ore, "h": hi}, gx, MINER_Y - 1)
-        push(c, 100)
-
-    # Outro: show the final dig site, then loop.
-    mined = cal.total
-    c = scene.background(dug, tick)
-    scene.header(c, mined)
-    scene.miner(c, len(cal.weeks) - 1, down=False)
-    push(c, 3000)
+    counted = cal.total
+    push(S.MINER_UP, OUTRO_MS)
     return frames, durations
-
-
-def _delta(prev: Canvas, cur: Canvas, clear: int) -> Canvas:
-    """Replace pixels that did not change since the previous frame with the
-    reserved transparent index. Long transparent runs compress very well."""
-    out = cur.copy()
-    px, before = out.px, prev.px
-    for i in range(len(px)):
-        if px[i] == before[i]:
-            px[i] = clear
-    return out
 
 
 def _merge_duplicates(frames: list[Canvas], durations: list[int]) -> tuple[list[Canvas], list[int]]:
@@ -214,11 +258,11 @@ def _merge_duplicates(frames: list[Canvas], durations: list[int]) -> tuple[list[
 
 def render_gif(cal: Calendar, path: str | Path, scale: int = 2) -> Path:
     frames, durations = _merge_duplicates(*render_frames(cal))
-    clear = S.IDX["clear"]
-    encoded = [frames[0]] + [_delta(a, b, clear) for a, b in pairwise(frames)]
-    images = [f.to_image(scale) for f in encoded]
+    images = [f.to_image(scale) for f in frames]
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    # With optimize, Pillow crops each frame to the area that changed and makes
+    # unchanged pixels inside it transparent, so a walking step costs a few bytes.
     images[0].save(
         path,
         save_all=True,
@@ -226,7 +270,7 @@ def render_gif(cal: Calendar, path: str | Path, scale: int = 2) -> Path:
         duration=durations,
         loop=0,
         disposal=1,  # keep the previous frame; transparent pixels show it through
-        transparency=clear,
-        optimize=False,
+        transparency=S.IDX["clear"],
+        optimize=True,
     )
     return path

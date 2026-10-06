@@ -30,7 +30,7 @@ response with `parse_calendar()`.
 Sprites, tiles, the palette and the pixel font live in
 [`src/contrib_miner/sprites.py`](src/contrib_miner/sprites.py) as text maps. Attach a before and
 after GIF or PNG to the pull request, rendered with `--sample` so it shows no real account.
-The palette must stay under 256 colors, and the rendered sample should stay under about 150 KB.
+The palette must stay under 256 colors, and the rendered sample should stay under about 250 KB.
 If the art changes, regenerate `docs/sample.gif` in the same pull request.
 
 Security issues go through [SECURITY.md](SECURITY.md), not public issues.

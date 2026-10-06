@@ -6,7 +6,7 @@ from PIL import Image, ImageSequence
 
 from contrib_miner import sprites as S
 from contrib_miner.fetch import parse_calendar, sample_calendar
-from contrib_miner.render import _merge_duplicates, render_frames, render_gif
+from contrib_miner.render import GRID_Y, _merge_duplicates, plan, render_frames, render_gif
 
 
 def payload(days_per_week):
@@ -60,10 +60,50 @@ class SpriteTests(unittest.TestCase):
         self.assertLessEqual(len(S.PALETTE), 256)
 
     def test_sprite_shapes(self):
-        for tile in (S.DIRT, S.STONE, S.ORE_MASK, S.TUNNEL):
+        for tile in (S.DIRT, S.STONE, S.ORE_MASK):
             self.assertEqual([len(r) for r in tile], [S.TILE] * S.TILE)
-        for pose in (S.MINER_UP, S.MINER_DOWN):
-            self.assertEqual(len({len(r) for r in pose}), 1)
+        for tile in (S.PATH, S.MINED):
+            self.assertEqual([len(r) for r in tile], [S.TILE] * S.TILE)
+        for pose in (S.MINER_UP, S.MINER_STEP, S.MINER_DOWN):
+            # The miner fits in one tunnel row; two extra columns reach into the next tile.
+            self.assertEqual([len(r) for r in pose], [S.TILE + 2] * S.TILE)
+
+
+class PlanTests(unittest.TestCase):
+    def walk(self, cal):
+        """Replay the plan, checking every rule, and return the mined cells."""
+        ores = {(c, r) for c, week in enumerate(cal.weeks) for r, day in enumerate(week) if day and day.level > 0}
+        mined = set()
+        steps = plan(cal)
+        self.assertEqual((steps[0].kind, steps[0].col, steps[0].row), ("enter", -1, 0))
+        col, row = -1, 0
+        for step in steps[1:]:
+            if step.kind == "move":
+                self.assertEqual(abs(step.col - col) + abs(step.row - row), 1, "moves one cell at a time")
+                self.assertTrue(0 <= step.row < 7)
+                self.assertFalse((step.col, step.row) in ores - mined, "never walks into unmined ore")
+                col, row = step.col, step.row
+            else:
+                self.assertEqual(step.kind, "mine")
+                self.assertEqual((step.col - 1, step.row), (col, row), "mines from the left-hand side")
+                self.assertIn((step.col, step.row), ores - mined)
+                mined.add((step.col, step.row))
+        return ores, mined
+
+    def test_sample_route_mines_every_ore_from_the_side(self):
+        ores, mined = self.walk(sample_calendar("tester"))
+        self.assertEqual(mined, ores)
+
+    def test_dense_and_empty_calendars(self):
+        for seed in range(5):
+            cal = sample_calendar("dense", seed=seed)
+            ores, mined = self.walk(cal)
+            self.assertEqual(mined, ores)
+        empty = sample_calendar("empty")
+        empty.weeks = [[None] * 7 for _ in empty.weeks]
+        ores, mined = self.walk(empty)
+        self.assertEqual(ores, set())
+        self.assertEqual(mined, set())
 
 
 class RenderTests(unittest.TestCase):
@@ -85,9 +125,9 @@ class RenderTests(unittest.TestCase):
         cal = sample_calendar("tester")
         last = render_frames(cal)[0][-1]
         self.assertEqual(last.w, 16 + len(cal.weeks) * S.TILE)
-        ore_colours = {S.IDX[c] for pair in S.ORES.values() for c in pair}
-        grid_top = 26
-        self.assertFalse(ore_colours & set(last.px[grid_top * last.w :]))
+        # Stone only appears in unmined ore blocks.
+        stone = {S.IDX["stone"], S.IDX["stone_dark"], S.IDX["stone_light"]}
+        self.assertFalse(stone & set(last.px[GRID_Y * last.w :]))
 
 
 if __name__ == "__main__":

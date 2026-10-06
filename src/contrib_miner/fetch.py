@@ -102,7 +102,7 @@ def sample_calendar(login: str = "octocat", seed: int = 7, end: date | None = No
         slots: list[Day | None] = [None] * 7
         for wd in range(7):
             if day <= end:
-                busy = rng.random() < 0.55
+                busy = rng.random() < 0.4
                 count = rng.choice([1, 2, 3, 5, 8, 13]) if busy else 0
                 level = 0 if count == 0 else 1 if count < 3 else 2 if count < 5 else 3 if count < 8 else 4
                 slots[wd] = Day(day.isoformat(), count, level)

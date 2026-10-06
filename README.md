@@ -14,19 +14,20 @@
 ---
 
 The contribution graph is the most personal thing on a GitHub profile, and it is also the most
-static. **contrib-miner** turns it into a tiny scene: a miner walks across your last year and digs
-up one ore for every day you contributed. The busier the day, the richer the ore.
+static. **contrib-miner** turns it into a tiny scene: a miner climbs down into your last year,
+walks to every day you contributed and mines it out. The busier the day, the richer the ore.
 
 <p align="center">
-  <img src="docs/sample.gif" alt="An 8-bit miner walking across a contribution graph, swinging a pickaxe and turning coal, copper, gold and diamond ore into tunnels while a contribution counter climbs" width="864">
+  <img src="docs/sample.gif" alt="An 8-bit miner climbing down into a contribution graph, walking through tunnels and striking coal, copper, gold and diamond ore from the side while a contribution counter climbs" width="864">
 </p>
 
 ## Features
 
 - ⛏️ **Your real graph** — the last year of contributions from the GitHub GraphQL API, placed exactly like the grid on your profile.
 - 💎 **Ore by intensity** — GitHub's four contribution levels become coal, copper, gold and diamond.
-- 🎞️ **Animated, then still** — sparkles, a pickaxe swing, a gem pop and a running counter. The loop ends on your year as a tunnel map.
-- 🪶 **Small** — each frame stores only the pixels that changed, so a full year is about 100 KB.
+- 🚶 **A real dig** — the miner walks the tunnels week by week, reaches each ore and strikes it from the side.
+- 🎞️ **Animated, then still** — sparkles, a pickaxe swing and a running counter. The loop ends on your year as a tunnel map.
+- 🪶 **Small** — each frame stores only the pixels that changed, so a full year is usually 100 to 250 KB.
 - 🔍 **Crisp at any size** — drawn at 1 pixel per sprite pixel and upscaled with nearest-neighbour sampling.
 - 🔒 **No servers, no secrets** — runs inside your own Actions with the default token, and publishes to a separate branch so your profile history stays clean.
 
@@ -114,9 +115,9 @@ GITHUB_TOKEN=$(gh auth token) .venv/bin/contrib-miner --user <you>        # your
 ## How it works
 
 1. `fetch.py` asks the GraphQL API for `contributionsCollection.contributionCalendar` and places each day by weekday.
-2. `render.py` draws every frame into a palette-indexed buffer, one byte per pixel.
-3. Identical frames are merged, and each remaining frame keeps only the pixels that changed. The rest become transparent.
-4. Pillow writes the GIF with a fixed 30-colour palette and nearest-neighbour upscaling.
+2. `plan()` in `render.py` routes the miner. He stays one week behind the ores he mines, so he always strikes from the left, and sweeps each week from the closer end.
+3. The mine is one persistent canvas that changes a cell at a time: dirt he walks through becomes a passage, and mined ore leaves a tunnel with rubble in its colour.
+4. Pillow writes the GIF with a fixed 30-colour palette, crops every frame to the area that changed and makes the rest transparent.
 
 Sprites, tiles, the palette and the 3x5 pixel font are plain text maps in
 [`sprites.py`](src/contrib_miner/sprites.py), so redrawing the miner is a text edit.
