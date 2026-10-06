@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/aserenaa/contrib-miner/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/aserenaa/contrib-miner/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-%E2%89%A53.10-3776AB?logo=python&logoColor=white">
-  <img alt="GitHub Action" src="https://img.shields.io/badge/GitHub%20Action-composite-2088FF?logo=githubactions&logoColor=white">
+  <a href="https://github.com/marketplace/actions/contrib-miner-gif"><img alt="GitHub Marketplace" src="https://img.shields.io/badge/Marketplace-Contrib%20Miner%20GIF-2088FF?logo=github&logoColor=white"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
