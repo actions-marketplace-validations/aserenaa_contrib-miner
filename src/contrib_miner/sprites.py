@@ -35,6 +35,8 @@ PALETTE: list[tuple[str, str]] = [
     ("boots", "#333c57"),
     ("spark", "#ffffff"),
     ("accent", "#ffcd75"),  # the finished contribution counter
+    ("purple", "#5d275d"),  # seasonal decorations
+    ("purple_hi", "#8e478c"),
     # Reserved: marks "unchanged since last frame" in delta-encoded GIF frames.
     ("clear", "#ff00ff"),
 ]
@@ -56,11 +58,12 @@ THEMES: dict[str, dict[str, str]] = {
 }
 
 
-def palette_bytes(theme: str = "dark") -> bytes:
-    overrides = THEMES[theme]
+def palette_bytes(theme: str = "dark", overrides: dict[str, str] | None = None) -> bytes:
+    """The GIF palette for a theme. Extra overrides (from a season) win over the theme."""
+    colours = {**THEMES[theme], **(overrides or {})}
     out = bytearray()
     for name, hexcode in PALETTE:
-        out += bytes.fromhex(overrides.get(name, hexcode)[1:])
+        out += bytes.fromhex(colours.get(name, hexcode)[1:])
     return bytes(out)
 
 

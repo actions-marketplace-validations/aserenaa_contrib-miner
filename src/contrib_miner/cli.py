@@ -10,6 +10,7 @@ import sys
 
 from .fetch import fetch_calendar, parse_calendar, sample_calendar
 from .render import DEFAULT_MAX_SECONDS, render_gif
+from .seasons import SEASON_CHOICES, resolve
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -18,6 +19,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--year", type=int, help="a calendar year instead of the last twelve months")
     p.add_argument("--output", default="dist/miner.gif", help="where to write the GIF")
     p.add_argument("--theme", choices=["dark", "light"], default="dark", help="theme of --output (default dark)")
+    p.add_argument(
+        "--season",
+        choices=SEASON_CHOICES,
+        default="none",
+        help="seasonal dressing; auto picks Halloween or Christmas from today's date (default none)",
+    )
     p.add_argument("--light-output", metavar="PATH", help="also write a light-theme GIF here, from the same data")
     p.add_argument("--scale", type=int, default=2, help="integer upscale factor (default 2)")
     p.add_argument(
@@ -57,14 +64,16 @@ def main(argv: list[str] | None = None) -> int:
             p.error("a token is required: pass --token or set GITHUB_TOKEN")
         cal = fetch_calendar(args.user, args.token, year=args.year)
 
+    season = resolve(args.season)
     jobs = [(args.output, args.theme)]
     if args.light_output:
         jobs.append((args.light_output, "light"))
     for path, theme in jobs:
-        out = render_gif(cal, path, scale=args.scale, max_seconds=args.max_seconds or None, theme=theme)
+        out = render_gif(cal, path, scale=args.scale, max_seconds=args.max_seconds or None, theme=theme, season=season)
         size_kb = out.stat().st_size / 1024
+        look = f"{theme}, {season.name}" if season else theme
         print(
-            f"wrote {out} ({theme}, {size_kb:.0f} KB, {len(cal.weeks)} weeks, {cal.total} contributions)",
+            f"wrote {out} ({look}, {size_kb:.0f} KB, {len(cal.weeks)} weeks, {cal.total} contributions)",
             file=sys.stderr,
         )
     return 0

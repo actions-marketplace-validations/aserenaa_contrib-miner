@@ -1,14 +1,17 @@
+import datetime
 import tempfile
 import unittest
 from pathlib import Path
 
 from PIL import Image, ImageSequence
 
+from contrib_miner import seasons as Z
 from contrib_miner import sprites as S
 from contrib_miner.fetch import Day, build_query, parse_calendar, sample_calendar, year_range
 from contrib_miner.render import (
     FLOOR,
     GRID_Y,
+    Scene,
     Timing,
     _merge_duplicates,
     choose_timing,
@@ -216,6 +219,54 @@ class ThemeTests(unittest.TestCase):
     def test_unknown_theme_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError):
             render_gif(sample_calendar("tester"), Path(tmp) / "x.gif", theme="neon")
+
+
+class SeasonTests(unittest.TestCase):
+    def test_auto_picks_by_date(self):
+        cases = {
+            datetime.date(2026, 10, 14): None,
+            datetime.date(2026, 10, 15): "halloween",
+            datetime.date(2026, 11, 1): "halloween",
+            datetime.date(2026, 11, 2): None,
+            datetime.date(2026, 12, 1): "christmas",
+            datetime.date(2026, 12, 26): "christmas",
+            datetime.date(2026, 12, 27): None,
+            datetime.date(2027, 6, 1): None,
+        }
+        for day, expected in cases.items():
+            season = Z.resolve("auto", today=day)
+            self.assertEqual(season.name if season else None, expected, day)
+
+    def test_explicit_and_unknown_choices(self):
+        self.assertIsNone(Z.resolve("none"))
+        self.assertEqual(Z.resolve("christmas").name, "christmas")
+        with self.assertRaises(ValueError):
+            Z.resolve("easter")
+
+    def test_seasons_cover_both_themes_with_known_colours(self):
+        names = {name for name, _ in S.PALETTE}
+        for season in Z.SEASONS.values():
+            self.assertEqual(set(season.palette), set(S.THEMES), season.name)
+            for overrides in season.palette.values():
+                self.assertLessEqual(set(overrides), names, season.name)
+            self.assertLessEqual(set(season.hat.values()) | {season.card_border}, names, season.name)
+
+    def test_seasons_only_dress_the_surface(self):
+        # Compare the mine background; the miner himself wears a seasonal hat.
+        cal = sample_calendar("tester")
+        plain = Scene(cal).base
+        below = GRID_Y * plain.w
+        for season in Z.SEASONS.values():
+            for theme in S.THEMES:
+                dressed = Scene(cal, theme, season).base
+                self.assertEqual(dressed.px[below:], plain.px[below:], f"{season.name}/{theme} changed the mine")
+
+    def test_seasonal_gif_decodes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for season in Z.SEASONS.values():
+                out = render_gif(sample_calendar("tester"), Path(tmp) / f"{season.name}.gif", scale=1, season=season)
+                bg = Image.open(out).convert("RGB").getpixel((0, 0))
+                self.assertEqual(bg, tuple(bytes.fromhex(season.palette["dark"]["bg"][1:])))
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from PIL import Image
 
 from . import sprites as S
 from .fetch import Calendar
+from .seasons import Season
 from .stats import Stats, summarize
 
 MARGIN_X = 8  # one tile of dirt on each side; the left one holds the entry shaft
@@ -129,9 +130,9 @@ class Canvas:
                     if bit == "#":
                         self.set(x + i * S.GLYPH_ADVANCE + dx, y + dy, c)
 
-    def to_image(self, scale: int, theme: str = "dark") -> Image.Image:
+    def to_image(self, scale: int, theme: str = "dark", season: Season | None = None) -> Image.Image:
         img = Image.frombytes("P", (self.w, self.h), bytes(self.px))
-        img.putpalette(S.palette_bytes(theme))
+        img.putpalette(S.palette_bytes(theme, season.palette.get(theme) if season else None))
         if scale > 1:
             img = img.resize((self.w * scale, self.h * scale), Image.Resampling.NEAREST)
         return img
@@ -187,9 +188,11 @@ def _ore_tile(level: int) -> tuple[list[str], dict[str, str]]:
 class Scene:
     """Holds the mine as a persistent canvas that only changes cell by cell."""
 
-    def __init__(self, cal: Calendar, theme: str = "dark"):
+    def __init__(self, cal: Calendar, theme: str = "dark", season: Season | None = None):
         self.cal = cal
         self.theme = theme
+        self.season = season
+        self.miner_key = {**S.MINER_KEY, **(season.hat if season else {})}
         self.cols = len(cal.weeks)
         self.w = MARGIN_X * 2 + self.cols * S.TILE
         self.h = GRID_Y + ROWS * S.TILE + BOTTOM
@@ -225,6 +228,8 @@ class Scene:
         if self.theme == "light":
             for x, y in self.clouds:
                 c.blit(S.CLOUD, S.CLOUD_KEY, x, y)
+        if self.season:
+            self.season.decorate(c, self, random.Random(f"{self.cal.login}:{self.season.name}"))
         for col in range(self.cols):
             for row in range(ROWS):
                 lvl = self.level(col, row)
@@ -262,7 +267,7 @@ class Scene:
         for x, y in effects:
             c.blit(S.SPARKLE, S.SPARKLE_KEY, x, y)
         x, y, pose = miner
-        c.blit(pose, S.MINER_KEY, x, y)
+        c.blit(pose, self.miner_key, x, y)
         return c
 
 
@@ -304,7 +309,7 @@ def card_lines(stats: Stats) -> list[list[Run]]:
     ]
 
 
-def draw_card(c: Canvas, stats: Stats) -> None:
+def draw_card(c: Canvas, stats: Stats, border: str = "gold") -> None:
     """A dark panel centred over the mine. It uses fixed colours so it reads the same in every theme."""
     lines = card_lines(stats)
     pad, line_h = 6, 8
@@ -312,7 +317,7 @@ def draw_card(c: Canvas, stats: Stats) -> None:
     h = len(lines) * line_h - 3 + pad * 2
     x0 = (c.w - w) // 2
     y0 = GRID_Y + (ROWS * S.TILE - h) // 2
-    c.rect(x0 - 1, y0 - 1, w + 2, h + 2, S.IDX["gold"])
+    c.rect(x0 - 1, y0 - 1, w + 2, h + 2, S.IDX[border])
     c.rect(x0, y0, w, h, S.IDX["tunnel"])
     for i, line in enumerate(lines):
         x = x0 + (w - _run_width(line)) // 2
@@ -328,7 +333,10 @@ def draw_card(c: Canvas, stats: Stats) -> None:
 
 
 def render_frames(
-    cal: Calendar, max_seconds: float | None = DEFAULT_MAX_SECONDS, theme: str = "dark"
+    cal: Calendar,
+    max_seconds: float | None = DEFAULT_MAX_SECONDS,
+    theme: str = "dark",
+    season: Season | None = None,
 ) -> tuple[list[Canvas], list[int]]:
     steps = plan(cal)
     timing = choose_timing(
@@ -336,7 +344,7 @@ def render_frames(
         mines=sum(s.kind == "mine" for s in steps),
         max_seconds=max_seconds,
     )
-    scene = Scene(cal, theme)
+    scene = Scene(cal, theme, season)
     frames: list[Canvas] = []
     durations: list[int] = []
     counted = 0
@@ -382,7 +390,7 @@ def render_frames(
     counted = cal.total
     push(S.MINER_UP, OUTRO_MS)
     card = scene.frame(len(frames), counted, (x, y, S.MINER_UP))
-    draw_card(card, summarize(cal))
+    draw_card(card, summarize(cal), season.card_border if season else "gold")
     frames.append(card)
     durations.append(CARD_MS)
     return frames, durations
@@ -407,11 +415,12 @@ def render_gif(
     scale: int = 2,
     max_seconds: float | None = DEFAULT_MAX_SECONDS,
     theme: str = "dark",
+    season: Season | None = None,
 ) -> Path:
     if theme not in S.THEMES:
         raise ValueError(f"unknown theme {theme!r}; choose from {', '.join(S.THEMES)}")
-    frames, durations = _merge_duplicates(*render_frames(cal, max_seconds, theme))
-    images = [f.to_image(scale, theme) for f in frames]
+    frames, durations = _merge_duplicates(*render_frames(cal, max_seconds, theme, season))
+    images = [f.to_image(scale, theme, season) for f in frames]
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     # With optimize, Pillow crops each frame to the area that changed and makes
