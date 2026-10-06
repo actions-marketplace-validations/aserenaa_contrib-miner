@@ -3,7 +3,6 @@ where each character maps to a palette entry and '.' is transparent."""
 
 from __future__ import annotations
 
-# Order matters: the index of each entry is its GIF palette index.
 PALETTE: list[tuple[str, str]] = [
     ("bg", "#1a1c2c"),
     ("star", "#566c86"),
@@ -34,23 +33,21 @@ PALETTE: list[tuple[str, str]] = [
     ("pants", "#3b5dc9"),
     ("boots", "#333c57"),
     ("spark", "#ffffff"),
-    ("accent", "#ffcd75"),  # the finished contribution counter
-    ("purple", "#5d275d"),  # seasonal decorations
+    ("accent", "#ffcd75"),
+    ("purple", "#5d275d"),
     ("purple_hi", "#8e478c"),
-    # Reserved: marks "unchanged since last frame" in delta-encoded GIF frames.
-    ("clear", "#ff00ff"),
+    ("transparent", "#ff00ff"),
 ]
 
 IDX = {name: i for i, (name, _) in enumerate(PALETTE)}
 
 
-# Themes only recolour the sky and the header; the mine looks the same in both.
 THEMES: dict[str, dict[str, str]] = {
     "dark": {},
     "light": {
         "bg": "#a6dcf7",
-        "star": "#ffffff",  # cloud body
-        "star_hi": "#d9f0fc",  # cloud shading
+        "star": "#ffffff",
+        "star_hi": "#d9f0fc",
         "text": "#1a1c2c",
         "text_dim": "#333c57",
         "accent": "#b13e53",
@@ -69,7 +66,6 @@ def palette_bytes(theme: str = "dark", overrides: dict[str, str] | None = None) 
 
 TILE = 8
 
-# --- Tiles -----------------------------------------------------------------
 
 DIRT = [
     "ddddDddd",
@@ -106,7 +102,6 @@ ORE_MASK = [
     "........",
 ]
 
-# Ore colours for contribution levels 1..4.
 ORES = {
     1: ("coal", "coal_hi"),
     2: ("copper", "copper_hi"),
@@ -123,14 +118,12 @@ SPARKLE = [
 ]
 SPARKLE_KEY = {"x": "gold_hi", "w": "spark"}
 
-# Ore icon for the closing card.
 GEM = [
     ".h.",
     "hoo",
     ".o.",
 ]
 
-# Daytime sky decoration for the light theme.
 CLOUD = [
     "..hh...",
     ".hcchh.",
@@ -138,7 +131,6 @@ CLOUD = [
 ]
 CLOUD_KEY = {"c": "star", "h": "star_hi"}
 
-# Walked-through dirt: a darker passage.
 PATH = [
     "eeeeeeee",
     "DDDDDDDD",
@@ -151,8 +143,6 @@ PATH = [
 ]
 PATH_KEY = {"D": "dirt_dark", "d": "dirt", "e": "tunnel_edge"}
 
-# A mined ore: an empty tunnel with a little rubble in the ore's colour,
-# so the finished mine still shows the shape of the contribution graph.
 MINED = [
     "eeeeeeee",
     "tttttttt",
@@ -164,8 +154,6 @@ MINED = [
     "toohthoo",
 ]
 
-# --- Miner (faces right, 10x8, fits in one 8x8 tunnel) -----------------------
-# Columns 8-9 reach into the next tile, so the pickaxe hits the ore beside him.
 
 MINER_KEY = {
     "y": "gold",
@@ -179,7 +167,6 @@ MINER_KEY = {
     "H": "text_dim",
 }
 
-# Pickaxe raised: used for walking (two leg poses) and the wind-up.
 MINER_UP = [
     ".yyy..HHH.",
     "yyyyw.b..H",
@@ -195,7 +182,6 @@ MINER_STEP = MINER_UP[:6] + [
     "o...o.....",
 ]
 
-# Pickaxe swung into the tile on the right.
 MINER_DOWN = [
     ".yyy......",
     "yyyyw.....",
@@ -207,7 +193,6 @@ MINER_DOWN = [
     ".o.o......",
 ]
 
-# --- 3x5 pixel font -----------------------------------------------------------
 
 # fmt: off
 _FONT_SRC = {

@@ -1,16 +1,10 @@
-"""Turn a Calendar into an animated GIF of a miner digging up contributions.
-
-The miner climbs down a shaft on the left and works through the year one week
-(column) at a time. He always stands in the column to the left of the ores he
-is mining and swings at them from the side, walking up and down to reach each
-one. Dirt he walks through becomes a passage; mined ore leaves a tunnel with a
-little rubble, so the finished mine still shows the contribution graph.
-"""
+"""Turn a Calendar into an animated GIF of a miner digging up contributions."""
 
 from __future__ import annotations
 
+import math
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
@@ -18,77 +12,69 @@ from PIL import Image
 
 from . import sprites as S
 from .fetch import Calendar
+from .layout import BOTTOM, GRASS_Y, GRID_Y, HEADER_Y, MARGIN_X, ROWS, SKY_DECORATION_MIN_X, SURFACE_Y
 from .seasons import Season
 from .stats import Stats, summarize
 
-MARGIN_X = 8  # one tile of dirt on each side; the left one holds the entry shaft
-HEADER_Y = 3
-GRASS_Y = 18
-GRID_Y = 21
-BOTTOM = 4
-ROWS = 7
-SURFACE_Y = GRASS_Y - S.TILE  # where the miner stands before climbing down
-
-# Frame timings in milliseconds. GIF stores delays in 10 ms units, so keep multiples of 10.
 INTRO_MS = 600
-OUTRO_MS = 1000  # the finished mine, before the card
+FINISHED_MINE_MS = 1000
 CARD_MS = 4000
-TWINKLE_EVERY = 40  # frames; star changes touch the whole sky, so keep them rare
+TWINKLE_EVERY_FRAMES = 40
 DEFAULT_MAX_SECONDS = 25
+GIF_DELAY_UNIT_MS = 10
+KEEP_PREVIOUS_FRAME = 1
 
 
 @dataclass(frozen=True)
 class Timing:
-    step: int = 40  # ms per walking frame
-    wind_up: int = 50
-    strike: int = 70
-    stride: int = 1  # cells walked per frame
+    step_ms: int = 40
+    wind_up_ms: int = 50
+    strike_ms: int = 70
+    cells_per_step: int = 1
+
+    @property
+    def skips_wind_up(self) -> bool:
+        return self.wind_up_ms == 0
 
     def mining_ms(self, moves: int, mines: int) -> int:
-        walk_frames = -(-moves // self.stride)  # ceiling division
-        if not self.wind_up:
-            # Walking between neighbouring ores is folded into the strike frame.
+        walk_frames = math.ceil(moves / self.cells_per_step)
+        if self.skips_wind_up:
             walk_frames = max(0, walk_frames - mines)
-        return walk_frames * self.step + mines * (self.wind_up + self.strike)
+        return walk_frames * self.step_ms + mines * (self.wind_up_ms + self.strike_ms)
 
 
-# Fastest timings that still read as walking and swinging. Many browsers slow
-# GIF delays under 20 ms down to 100 ms, so nothing goes below 20.
-FLOOR = Timing(step=20, wind_up=20, strike=40)
-MAX_STRIDE = 4
+FASTEST = Timing(step_ms=20, wind_up_ms=20, strike_ms=40)
+MAX_CELLS_PER_STEP = 4
 
 
-def _tens(ms: float, floor: int) -> int:
-    return max(floor, int(ms // 10) * 10)
+def _scaled_delay(ms: float, fastest: int) -> int:
+    whole_units = int(ms // GIF_DELAY_UNIT_MS) * GIF_DELAY_UNIT_MS
+    return max(fastest, whole_units)
 
 
 def choose_timing(moves: int, mines: int, max_seconds: float | None) -> Timing:
     """Pick the slowest, smoothest timing whose loop fits in max_seconds.
 
-    Delays shrink proportionally down to FLOOR first. If that is still too
-    long, the miner covers several cells per walking frame, which also keeps
-    the file small. As a last resort for very busy years, the wind-up frame is
-    dropped: the walking pose already holds the pickaxe up.
+    Delays shrink down to FASTEST, then the miner walks several cells per
+    frame, and very busy years finally skip the wind-up frame.
     """
     base = Timing()
     if not max_seconds:
         return base
-    budget = max_seconds * 1000 - INTRO_MS - OUTRO_MS - CARD_MS
+    budget = max_seconds * 1000 - INTRO_MS - FINISHED_MINE_MS - CARD_MS
     natural = base.mining_ms(moves, mines)
     if natural <= budget:
         return base
     factor = max(budget, 0) / natural
     timing = Timing(
-        step=_tens(base.step * factor, FLOOR.step),
-        wind_up=_tens(base.wind_up * factor, FLOOR.wind_up),
-        strike=_tens(base.strike * factor, FLOOR.strike),
+        step_ms=_scaled_delay(base.step_ms * factor, FASTEST.step_ms),
+        wind_up_ms=_scaled_delay(base.wind_up_ms * factor, FASTEST.wind_up_ms),
+        strike_ms=_scaled_delay(base.strike_ms * factor, FASTEST.strike_ms),
     )
-    stride = 1
-    while timing.mining_ms(moves, mines) > budget and stride < MAX_STRIDE:
-        stride += 1
-        timing = Timing(timing.step, timing.wind_up, timing.strike, stride)
+    while timing.mining_ms(moves, mines) > budget and timing.cells_per_step < MAX_CELLS_PER_STEP:
+        timing = replace(timing, cells_per_step=timing.cells_per_step + 1)
     if timing.mining_ms(moves, mines) > budget:
-        timing = Timing(timing.step, 0, timing.strike, timing.stride)
+        timing = replace(timing, wind_up_ms=0)
     return timing
 
 
@@ -132,7 +118,7 @@ class Canvas:
 
     def to_image(self, scale: int, theme: str = "dark", season: Season | None = None) -> Image.Image:
         img = Image.frombytes("P", (self.w, self.h), bytes(self.px))
-        img.putpalette(S.palette_bytes(theme, season.palette.get(theme) if season else None))
+        img.putpalette(S.palette_bytes(theme, season.palette_by_theme.get(theme) if season else None))
         if scale > 1:
             img = img.resize((self.w * scale, self.h * scale), Image.Resampling.NEAREST)
         return img
@@ -152,23 +138,29 @@ def _ore_rows(week) -> list[int]:
     return [row for row, day in enumerate(week) if day is not None and day.level > 0]
 
 
+def _nearest_end_first(rows: list[int], current_row: int) -> list[int]:
+    if abs(current_row - rows[-1]) < abs(current_row - rows[0]):
+        return rows[::-1]
+    return rows
+
+
 def plan(cal: Calendar) -> list[Step]:
-    """Plan a route that mines every ore from its left-hand side."""
+    """Plan a route that mines every ore from its left-hand side.
+
+    The miner stays one column behind the ores he mines, so every cell he
+    walks into is already mined or plain dirt.
+    """
     steps = [Step("enter", -1, 0)]
     col, row = -1, 0
     for target, week in enumerate(cal.weeks):
-        # Stay one column behind the column being mined. Everything in the
-        # column he walks into was already mined or is plain dirt.
-        while col < target - 1:
+        standing_col = target - 1
+        while col < standing_col:
             col += 1
             steps.append(Step("move", col, row))
         ores = _ore_rows(week)
         if not ores:
             continue
-        # Sweep the column starting from whichever end is closer.
-        if abs(row - ores[-1]) < abs(row - ores[0]):
-            ores.reverse()
-        for ore_row in ores:
+        for ore_row in _nearest_end_first(ores, row):
             while row != ore_row:
                 row += 1 if ore_row > row else -1
                 steps.append(Step("move", col, row))
@@ -192,7 +184,7 @@ class Scene:
         self.cal = cal
         self.theme = theme
         self.season = season
-        self.miner_key = {**S.MINER_KEY, **(season.hat if season else {})}
+        self.miner_key = {**S.MINER_KEY, **(season.hat_colours if season else {})}
         self.cols = len(cal.weeks)
         self.w = MARGIN_X * 2 + self.cols * S.TILE
         self.h = GRID_Y + ROWS * S.TILE + BOTTOM
@@ -200,8 +192,9 @@ class Scene:
         self.stars = [
             (rng.randrange(self.w), rng.randrange(1, GRASS_Y - 1), rng.random() < 0.3) for _ in range(self.w // 12)
         ]
-        # Clouds stay clear of the shaft on the left and the header text above.
-        self.clouds = [(rng.randrange(24, self.w - 10), rng.randrange(9, 13)) for _ in range(self.w // 70)]
+        self.clouds = [
+            (rng.randrange(SKY_DECORATION_MIN_X, self.w - 10), rng.randrange(9, 13)) for _ in range(self.w // 70)
+        ]
         self.ore_tiles = {lvl: _ore_tile(lvl) for lvl in S.ORES}
         self.walked: set[tuple[int, int]] = set()
         self.mined: set[tuple[int, int]] = set()
@@ -255,7 +248,7 @@ class Scene:
     def frame(self, tick: int, counted: int, miner: tuple[int, int, list[str]], effects=()) -> Canvas:
         c = self.base.copy()
         if self.theme == "dark":
-            twinkle = tick // TWINKLE_EVERY
+            twinkle = tick // TWINKLE_EVERY_FRAMES
             for i, (x, y, bright) in enumerate(self.stars):
                 if bright or (i + twinkle) % 5 != 0:
                     c.set(x, y, S.IDX["star_hi" if bright and twinkle % 2 else "star"])
@@ -271,26 +264,25 @@ class Scene:
         return c
 
 
-Run = tuple[str, str]  # (text, palette colour); a "gem:<level>" text draws an ore icon
+Run = tuple[str, str]
+GEM_PREFIX = "gem:"
+GEM_WIDTH = 4
+CARD_GEM_COLOURS = {**S.ORES, 1: ("coal_hi", "stone_light")}
 
 
 def _run_width(runs: list[Run]) -> int:
     width = 0
     for text, _ in runs:
-        width += 4 if text.startswith("gem:") else len(text) * S.GLYPH_ADVANCE
+        width += GEM_WIDTH if text.startswith(GEM_PREFIX) else len(text) * S.GLYPH_ADVANCE
     return width - 1
-
-
-# Coal is nearly black, so on the dark card its icon uses lighter greys.
-CARD_GEMS = {1: ("coal_hi", "stone_light")}
 
 
 def card_lines(stats: Stats) -> list[list[Run]]:
     ores: list[Run] = []
-    for level, days in stats.ores.items():
+    for level, days in stats.days_by_ore_level.items():
         if ores:
             ores.append(("  ", "spark"))
-        ores += [(f"gem:{level}", ""), (f" {days}", "spark")]
+        ores += [(f"{GEM_PREFIX}{level}", ""), (f" {days}", "spark")]
     return [
         [
             (str(stats.total), "spark"),
@@ -323,10 +315,10 @@ def draw_card(c: Canvas, stats: Stats, border: str = "gold") -> None:
         x = x0 + (w - _run_width(line)) // 2
         y = y0 + pad + i * line_h
         for text, colour in line:
-            if text.startswith("gem:"):
-                ore, hi = CARD_GEMS.get(int(text[4:]), S.ORES[int(text[4:])])
+            if text.startswith(GEM_PREFIX):
+                ore, hi = CARD_GEM_COLOURS[int(text.removeprefix(GEM_PREFIX))]
                 c.blit(S.GEM, {"o": ore, "h": hi}, x, y + 1)
-                x += 4
+                x += GEM_WIDTH
             else:
                 c.text(text, x, y, colour)
                 x += len(text) * S.GLYPH_ADVANCE
@@ -349,20 +341,19 @@ def render_frames(
     durations: list[int] = []
     counted = 0
     x, y = 0, SURFACE_Y
-    stride = 0
-    pending = 0  # cells walked since the last walking frame
+    steps_shown = 0
+    cells_walked_unshown = 0
 
     def push(pose: list[str], ms: int, effects=()) -> None:
         frames.append(scene.frame(len(frames), counted, (x, y, pose), effects))
         durations.append(ms)
 
-    def flush_walk() -> None:
-        # Draw the miner where he has walked to, alternating legs.
-        nonlocal stride, pending
-        if pending:
-            stride += 1
-            push(S.MINER_STEP if stride % 2 else S.MINER_UP, timing.step)
-            pending = 0
+    def show_walk() -> None:
+        nonlocal steps_shown, cells_walked_unshown
+        if cells_walked_unshown:
+            steps_shown += 1
+            push(S.MINER_STEP if steps_shown % 2 else S.MINER_UP, timing.step_ms)
+            cells_walked_unshown = 0
 
     push(S.MINER_UP, INTRO_MS)
     for step in steps:
@@ -371,24 +362,23 @@ def render_frames(
                 scene.open_shaft()
             scene.walk_into(step.col, step.row)
             x, y = scene.cell_xy(step.col, step.row)
-            pending += 1
-            if pending >= timing.stride:
-                flush_walk()
+            cells_walked_unshown += 1
+            if cells_walked_unshown >= timing.cells_per_step:
+                show_walk()
         else:
-            if timing.wind_up:
-                flush_walk()
-            else:
-                pending = 0  # fastest mode: the strike frame also shows where he walked to
             ox, oy = scene.cell_xy(step.col, step.row)
-            if timing.wind_up:
-                push(S.MINER_UP, timing.wind_up, effects=[(ox + 2, oy + 2)])
+            if timing.skips_wind_up:
+                cells_walked_unshown = 0
+            else:
+                show_walk()
+                push(S.MINER_UP, timing.wind_up_ms, effects=[(ox + 2, oy + 2)])
             scene.mine(step.col, step.row)
             counted += cal.weeks[step.col][step.row].count
-            push(S.MINER_DOWN, timing.strike, effects=[(ox + 4, oy + 1)])
-    flush_walk()
+            push(S.MINER_DOWN, timing.strike_ms, effects=[(ox + 4, oy + 1)])
+    show_walk()
 
     counted = cal.total
-    push(S.MINER_UP, OUTRO_MS)
+    push(S.MINER_UP, FINISHED_MINE_MS)
     card = scene.frame(len(frames), counted, (x, y, S.MINER_UP))
     draw_card(card, summarize(cal), season.card_border if season else "gold")
     frames.append(card)
@@ -423,16 +413,14 @@ def render_gif(
     images = [f.to_image(scale, theme, season) for f in frames]
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    # With optimize, Pillow crops each frame to the area that changed and makes
-    # unchanged pixels inside it transparent, so a walking step costs a few bytes.
     images[0].save(
         path,
         save_all=True,
         append_images=images[1:],
         duration=durations,
         loop=0,
-        disposal=1,  # keep the previous frame; transparent pixels show it through
-        transparency=S.IDX["clear"],
+        disposal=KEEP_PREVIOUS_FRAME,
+        transparency=S.IDX["transparent"],
         optimize=True,
     )
     return path

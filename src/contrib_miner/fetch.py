@@ -49,11 +49,12 @@ class Day:
 
 @dataclass
 class Calendar:
+    """A year of contributions. Each week has seven weekday slots, Sunday first;
+    days outside the range are None. A year of None means the last twelve months."""
+
     login: str
     total: int
-    year: int | None = None  # None means the last twelve months
-    # Each week has 7 slots indexed by weekday (0 = Sunday). Days outside the
-    # one-year window are None, which happens in the first and last week.
+    year: int | None = None
     weeks: list[list[Day | None]] = field(default_factory=list)
 
 
@@ -101,12 +102,17 @@ def fetch_calendar(login: str, token: str, year: int | None = None, timeout: flo
     return parse_calendar(resp.json(), year)
 
 
+def _previous_sunday(day: date) -> date:
+    days_since_sunday = (day.weekday() + 1) % 7
+    return day - timedelta(days=days_since_sunday)
+
+
 def sample_calendar(login: str = "octocat", seed: int = 7, end: date | None = None) -> Calendar:
     """Deterministic fake calendar for offline previews and CI."""
     rng = random.Random(seed)
     end = end or date(2026, 10, 6)
     start = end - timedelta(days=364)
-    start -= timedelta(days=(start.weekday() + 1) % 7)  # back up to Sunday
+    start = _previous_sunday(start)
     weeks: list[list[Day | None]] = []
     total = 0
     day = start

@@ -1,8 +1,4 @@
-"""Seasonal dressing: sky colours, surface decorations and the miner's hat.
-
-A season never changes the mine itself, only what sits above the grass, so
-every frame costs the same and the contribution graph reads the same.
-"""
+"""Seasonal dressing: sky colours, surface decorations and the miner's hat. The mine itself never changes."""
 
 from __future__ import annotations
 
@@ -13,35 +9,34 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from . import sprites as S
+from .layout import GRASS_Y, SKY_DECORATION_MIN_X
 
 if TYPE_CHECKING:
     from .render import Canvas, Scene
 
 Decorate = Callable[["Canvas", "Scene", random.Random], None]
+MonthDay = tuple[int, int]
 
 
 @dataclass(frozen=True)
 class Season:
     name: str
-    start: tuple[int, int]  # (month, day), inclusive
-    end: tuple[int, int]  # (month, day), inclusive
-    palette: dict[str, dict[str, str]]  # theme -> palette overrides
-    hat: dict[str, str]  # overrides for the miner's helmet ("y") and lamp ("w")
+    first_day: MonthDay
+    last_day: MonthDay
+    palette_by_theme: dict[str, dict[str, str]]
+    hat_colours: dict[str, str]
     card_border: str
     decorate: Decorate = field(repr=False)
 
     def active_on(self, day: datetime.date) -> bool:
-        return self.start <= (day.month, day.day) <= self.end
+        return self.first_day <= (day.month, day.day) <= self.last_day
 
 
 def _surface_spots(scene: Scene, rng: random.Random, count: int, width: int) -> list[int]:
-    """Spread decorations along the surface, clear of the entry shaft on the left."""
-    lo, hi = 24, scene.w - width - 4
+    lo, hi = SKY_DECORATION_MIN_X, scene.w - width - 4
     slot = (hi - lo) // count
     return [lo + i * slot + rng.randrange(max(1, slot - width)) for i in range(count)]
 
-
-# --- Halloween -----------------------------------------------------------------
 
 MOON = [
     "..mmm..",
@@ -78,13 +73,10 @@ def _halloween(c: Canvas, scene: Scene, rng: random.Random) -> None:
     bat = {"b": "purple_hi" if scene.theme == "dark" else "coal"}
     for dx, dy in ((-30, 9), (12, 5), (40, 11)):
         c.blit(BAT, bat, mx + dx, dy)
-    from .render import GRASS_Y
-
+    pumpkin_top = GRASS_Y - len(PUMPKIN) + 1
     for x in _surface_spots(scene, rng, 7, len(PUMPKIN[0])):
-        c.blit(PUMPKIN, PUMPKIN_KEY, x, GRASS_Y - len(PUMPKIN) + 1)  # sits slightly in the grass
+        c.blit(PUMPKIN, PUMPKIN_KEY, x, pumpkin_top)
 
-
-# --- Christmas -----------------------------------------------------------------
 
 TREE = [
     "...*...",
@@ -100,14 +92,15 @@ TREE = [
 TREE_KEY = {"*": "gold", "g": "grass_dark", "G": "grass", "o": "shirt", "t": "dirt_light"}
 
 
-def _christmas(c: Canvas, scene: Scene, rng: random.Random) -> None:
-    from .render import GRASS_Y
-
-    # Snow on the grass: a white top row with a little drift below it.
+def _snow_on_grass(c: Canvas, scene: Scene, rng: random.Random) -> None:
     c.rect(0, GRASS_Y, scene.w, 1, S.IDX["spark"])
     for x in range(scene.w):
         if rng.random() < 0.35:
             c.set(x, GRASS_Y + 1, S.IDX["spark"])
+
+
+def _christmas(c: Canvas, scene: Scene, rng: random.Random) -> None:
+    _snow_on_grass(c, scene, rng)
     for x in _surface_spots(scene, rng, 7, len(TREE[0])):
         c.blit(TREE, TREE_KEY, x, GRASS_Y - len(TREE))
 
@@ -115,25 +108,25 @@ def _christmas(c: Canvas, scene: Scene, rng: random.Random) -> None:
 SEASONS: dict[str, Season] = {
     "halloween": Season(
         name="halloween",
-        start=(10, 15),
-        end=(11, 1),
-        palette={
+        first_day=(10, 15),
+        last_day=(11, 1),
+        palette_by_theme={
             "dark": {"bg": "#1f1030", "star": "#5d275d", "star_hi": "#8e478c", "accent": "#ef7d57"},
             "light": {"bg": "#f4a261", "star": "#ffd6a5", "star_hi": "#f8c08a", "accent": "#5d275d"},
         },
-        hat={"y": "purple", "w": "gold_hi"},
+        hat_colours={"y": "purple", "w": "gold_hi"},
         card_border="copper",
         decorate=_halloween,
     ),
     "christmas": Season(
         name="christmas",
-        start=(12, 1),
-        end=(12, 26),
-        palette={
+        first_day=(12, 1),
+        last_day=(12, 26),
+        palette_by_theme={
             "dark": {"bg": "#10213b", "star": "#94b0c2", "star_hi": "#ffffff", "accent": "#ffffff"},
             "light": {"bg": "#d6ecf7", "star": "#ffffff", "star_hi": "#eaf4fb", "accent": "#b13e53"},
         },
-        hat={"y": "shirt", "w": "spark"},
+        hat_colours={"y": "shirt", "w": "spark"},
         card_border="shirt",
         decorate=_christmas,
     ),

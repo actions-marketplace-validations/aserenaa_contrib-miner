@@ -11,9 +11,9 @@ from .fetch import Calendar
 class Stats:
     total: int
     active_days: int
-    best_day: int  # most contributions in a single day
-    longest_streak: int  # consecutive days with at least one contribution
-    ores: dict[int, int] = field(default_factory=dict)  # level -> number of days
+    best_day: int
+    longest_streak: int
+    days_by_ore_level: dict[int, int] = field(default_factory=dict)
 
 
 def summarize(cal: Calendar) -> Stats:
@@ -23,11 +23,11 @@ def summarize(cal: Calendar) -> Stats:
     for day in days:
         streak = streak + 1 if day.count > 0 else 0
         longest = max(longest, streak)
-    ores = {level: sum(1 for d in days if d.level == level) for level in (4, 3, 2, 1)}
+    days_by_ore_level = {level: sum(1 for d in days if d.level == level) for level in (4, 3, 2, 1)}
     return Stats(
         total=cal.total,
         active_days=sum(1 for d in days if d.count > 0),
         best_day=max((d.count for d in days), default=0),
         longest_streak=longest,
-        ores=ores,
+        days_by_ore_level=days_by_ore_level,
     )
