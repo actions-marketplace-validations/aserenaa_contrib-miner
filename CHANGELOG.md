@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `max_seconds` input and `--max-seconds` flag, 25 by default. Busy years speed up to fit: delays
+  shrink first, then the miner walks several cells per frame, and very busy years skip the wind-up.
+
 ## [1.1.0] - 2026-10-06
 
 ### Changed

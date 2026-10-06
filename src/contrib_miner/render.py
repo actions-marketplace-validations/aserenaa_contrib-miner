@@ -29,11 +29,61 @@ SURFACE_Y = GRASS_Y - S.TILE  # where the miner stands before climbing down
 
 # Frame timings in milliseconds. GIF stores delays in 10 ms units, so keep multiples of 10.
 INTRO_MS = 600
-STEP_MS = 40
-WIND_UP_MS = 50
-STRIKE_MS = 70
-TWINKLE_EVERY = 40  # frames; star changes touch the whole sky, so keep them rare
 OUTRO_MS = 3000
+TWINKLE_EVERY = 40  # frames; star changes touch the whole sky, so keep them rare
+DEFAULT_MAX_SECONDS = 25
+
+
+@dataclass(frozen=True)
+class Timing:
+    step: int = 40  # ms per walking frame
+    wind_up: int = 50
+    strike: int = 70
+    stride: int = 1  # cells walked per frame
+
+    def mining_ms(self, moves: int, mines: int) -> int:
+        walk_frames = -(-moves // self.stride)  # ceiling division
+        return walk_frames * self.step + mines * (self.wind_up + self.strike)
+
+
+# Fastest timings that still read as walking and swinging. Many browsers slow
+# GIF delays under 20 ms down to 100 ms, so nothing goes below 20.
+FLOOR = Timing(step=20, wind_up=20, strike=40)
+MAX_STRIDE = 4
+
+
+def _tens(ms: float, floor: int) -> int:
+    return max(floor, int(ms // 10) * 10)
+
+
+def choose_timing(moves: int, mines: int, max_seconds: float | None) -> Timing:
+    """Pick the slowest, smoothest timing whose loop fits in max_seconds.
+
+    Delays shrink proportionally down to FLOOR first. If that is still too
+    long, the miner covers several cells per walking frame, which also keeps
+    the file small. As a last resort for very busy years, the wind-up frame is
+    dropped: the walking pose already holds the pickaxe up.
+    """
+    base = Timing()
+    if not max_seconds:
+        return base
+    budget = max_seconds * 1000 - INTRO_MS - OUTRO_MS
+    natural = base.mining_ms(moves, mines)
+    if natural <= budget:
+        return base
+    factor = max(budget, 0) / natural
+    timing = Timing(
+        step=_tens(base.step * factor, FLOOR.step),
+        wind_up=_tens(base.wind_up * factor, FLOOR.wind_up),
+        strike=_tens(base.strike * factor, FLOOR.strike),
+    )
+    stride = 1
+    while timing.mining_ms(moves, mines) > budget and stride < MAX_STRIDE:
+        stride += 1
+        timing = Timing(timing.step, timing.wind_up, timing.strike, stride)
+    if timing.mining_ms(moves, mines) > budget:
+        timing = Timing(timing.step, 0, timing.strike, timing.stride)
+    return timing
 
 
 class Canvas:
@@ -203,40 +253,52 @@ class Scene:
         return c
 
 
-def render_frames(cal: Calendar) -> tuple[list[Canvas], list[int]]:
+def render_frames(cal: Calendar, max_seconds: float | None = DEFAULT_MAX_SECONDS) -> tuple[list[Canvas], list[int]]:
+    steps = plan(cal)
+    timing = choose_timing(
+        moves=sum(s.kind != "mine" for s in steps),
+        mines=sum(s.kind == "mine" for s in steps),
+        max_seconds=max_seconds,
+    )
     scene = Scene(cal)
     frames: list[Canvas] = []
     durations: list[int] = []
     counted = 0
     x, y = 0, SURFACE_Y
     stride = 0
+    pending = 0  # cells walked since the last walking frame
 
     def push(pose: list[str], ms: int, effects=()) -> None:
         frames.append(scene.frame(len(frames), counted, (x, y, pose), effects))
         durations.append(ms)
 
-    def walk(tx: int, ty: int) -> None:
-        # One frame per cell, alternating legs.
-        nonlocal x, y, stride
-        x, y = tx, ty
-        stride += 1
-        push(S.MINER_STEP if stride % 2 else S.MINER_UP, STEP_MS)
+    def flush_walk() -> None:
+        # Draw the miner where he has walked to, alternating legs.
+        nonlocal stride, pending
+        if pending:
+            stride += 1
+            push(S.MINER_STEP if stride % 2 else S.MINER_UP, timing.step)
+            pending = 0
 
     push(S.MINER_UP, INTRO_MS)
-    for step in plan(cal):
-        if step.kind == "enter":
-            scene.open_shaft()
+    for step in steps:
+        if step.kind in ("enter", "move"):
+            if step.kind == "enter":
+                scene.open_shaft()
             scene.walk_into(step.col, step.row)
-            walk(*scene.cell_xy(step.col, step.row))
-        elif step.kind == "move":
-            scene.walk_into(step.col, step.row)
-            walk(*scene.cell_xy(step.col, step.row))
+            x, y = scene.cell_xy(step.col, step.row)
+            pending += 1
+            if pending >= timing.stride:
+                flush_walk()
         else:
+            flush_walk()
             ox, oy = scene.cell_xy(step.col, step.row)
-            push(S.MINER_UP, WIND_UP_MS, effects=[(ox + 2, oy + 2)])
+            if timing.wind_up:
+                push(S.MINER_UP, timing.wind_up, effects=[(ox + 2, oy + 2)])
             scene.mine(step.col, step.row)
             counted += cal.weeks[step.col][step.row].count
-            push(S.MINER_DOWN, STRIKE_MS, effects=[(ox + 4, oy + 1)])
+            push(S.MINER_DOWN, timing.strike, effects=[(ox + 4, oy + 1)])
+    flush_walk()
 
     counted = cal.total
     push(S.MINER_UP, OUTRO_MS)
@@ -256,8 +318,10 @@ def _merge_duplicates(frames: list[Canvas], durations: list[int]) -> tuple[list[
     return out_f, out_d
 
 
-def render_gif(cal: Calendar, path: str | Path, scale: int = 2) -> Path:
-    frames, durations = _merge_duplicates(*render_frames(cal))
+def render_gif(
+    cal: Calendar, path: str | Path, scale: int = 2, max_seconds: float | None = DEFAULT_MAX_SECONDS
+) -> Path:
+    frames, durations = _merge_duplicates(*render_frames(cal, max_seconds))
     images = [f.to_image(scale) for f in frames]
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

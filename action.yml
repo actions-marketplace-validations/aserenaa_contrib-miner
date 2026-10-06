@@ -15,6 +15,9 @@ inputs:
   scale:
     description: Integer upscale factor for crisp pixels (1-8).
     default: "2"
+  max_seconds:
+    description: Target loop length in seconds. Busy years speed up to fit; 0 keeps the natural speed.
+    default: "25"
   github_token:
     description: Token used for the GraphQL API. The default token sees public contributions only.
     default: ${{ github.token }}
@@ -37,9 +40,10 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
     - name: Render GIF
       shell: bash
-      run: contrib-miner --user "$USER_NAME" --output "$OUTPUT" --scale "$SCALE"
+      run: contrib-miner --user "$USER_NAME" --output "$OUTPUT" --scale "$SCALE" --max-seconds "$MAX_SECONDS"
       env:
         USER_NAME: ${{ inputs.github_user_name }}
         OUTPUT: ${{ inputs.output }}
         SCALE: ${{ inputs.scale }}
+        MAX_SECONDS: ${{ inputs.max_seconds }}
         GITHUB_TOKEN: ${{ inputs.github_token }}

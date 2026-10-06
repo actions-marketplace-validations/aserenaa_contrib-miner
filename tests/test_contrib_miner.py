@@ -5,8 +5,17 @@ from pathlib import Path
 from PIL import Image, ImageSequence
 
 from contrib_miner import sprites as S
-from contrib_miner.fetch import parse_calendar, sample_calendar
-from contrib_miner.render import GRID_Y, _merge_duplicates, plan, render_frames, render_gif
+from contrib_miner.fetch import Day, parse_calendar, sample_calendar
+from contrib_miner.render import (
+    FLOOR,
+    GRID_Y,
+    Timing,
+    _merge_duplicates,
+    choose_timing,
+    plan,
+    render_frames,
+    render_gif,
+)
 
 
 def payload(days_per_week):
@@ -128,6 +137,37 @@ class RenderTests(unittest.TestCase):
         # Stone only appears in unmined ore blocks.
         stone = {S.IDX["stone"], S.IDX["stone_dark"], S.IDX["stone_light"]}
         self.assertFalse(stone & set(last.px[GRID_Y * last.w :]))
+
+
+def busy_year(seed=3):
+    """A calendar with activity on every single day."""
+    cal = sample_calendar("busy", seed=seed)
+    cal.weeks = [[Day(d.date, 5, 1 + i % 4) if d else None for i, d in enumerate(w)] for w in cal.weeks]
+    return cal
+
+
+class TimingTests(unittest.TestCase):
+    def test_short_years_keep_the_natural_speed(self):
+        self.assertEqual(choose_timing(moves=50, mines=20, max_seconds=25), Timing())
+        self.assertEqual(choose_timing(moves=5000, mines=5000, max_seconds=None), Timing())
+
+    def test_never_faster_than_the_floor(self):
+        t = choose_timing(moves=10_000, mines=10_000, max_seconds=5)
+        self.assertGreaterEqual(t.step, FLOOR.step)
+        self.assertGreaterEqual(t.strike, FLOOR.strike)
+        for ms in (t.step, t.wind_up, t.strike):
+            self.assertEqual(ms % 10, 0, "GIF delays are stored in 10 ms units")
+
+    def test_loops_fit_the_budget(self):
+        for cal, limit in ((sample_calendar("tester"), 25), (busy_year(), 26)):
+            frames, durations = render_frames(cal, max_seconds=25)
+            self.assertLessEqual(sum(durations) / 1000, limit)
+
+    def test_uncapped_loop_is_longer(self):
+        cal = sample_calendar("tester")
+        capped = sum(render_frames(cal, max_seconds=25)[1])
+        uncapped = sum(render_frames(cal, max_seconds=None)[1])
+        self.assertGreater(uncapped, capped)
 
 
 if __name__ == "__main__":

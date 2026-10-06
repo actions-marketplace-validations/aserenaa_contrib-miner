@@ -27,6 +27,7 @@ walks to every day you contributed and mines it out. The busier the day, the ric
 - 💎 **Ore by intensity** — GitHub's four contribution levels become coal, copper, gold and diamond.
 - 🚶 **A real dig** — the miner walks the tunnels week by week, reaches each ore and strikes it from the side.
 - 🎞️ **Animated, then still** — sparkles, a pickaxe swing and a running counter. The loop ends on your year as a tunnel map.
+- ⏱️ **A loop that fits** — busy years speed up automatically, so the animation stays around 25 seconds.
 - 🪶 **Small** — each frame stores only the pixels that changed, so a full year is usually 100 to 250 KB.
 - 🔍 **Crisp at any size** — drawn at 1 pixel per sprite pixel and upscaled with nearest-neighbour sampling.
 - 🔒 **No servers, no secrets** — runs inside your own Actions with the default token, and publishes to a separate branch so your profile history stays clean.
@@ -88,6 +89,7 @@ jobs:
 | `github_user_name` | repository owner | Login whose contributions are rendered |
 | `output` | `dist/miner.gif` | Where to write the GIF |
 | `scale` | `2` | Integer upscale factor, 1 to 8 |
+| `max_seconds` | `25` | Target loop length. Busy years speed up to fit, `0` keeps the natural speed |
 | `github_token` | `github.token` | Token for the GraphQL API |
 
 ### Private contributions
